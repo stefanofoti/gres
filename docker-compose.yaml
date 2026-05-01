@@ -1,0 +1,29 @@
+# Usage: docker compose up -d
+
+services:
+
+  gres:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: gres
+    deploy:
+      replicas: 1
+    volumes:
+      - gres_data:/app/data
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-warn}
+    networks:
+      - gres-network
+
+networks:
+  gres-network:
+    driver: bridge
+
+volumes:
+  gres_data:

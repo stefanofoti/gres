@@ -1,0 +1,7 @@
+node_modules/
+settings.json
+data/
+.env
+.DS_Store
+.dev/
+*.zip
