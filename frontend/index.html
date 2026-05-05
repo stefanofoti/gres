@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a0f">
+  <title>Gres</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.4/chartist.min.css">
+  <link href="https://fonts.googleapis.com/css?family=DM+Sans:300,400,500|DM+Mono:400,500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Status Bar -->
+  <div id="status-bar">
+    <span id="status-dot" class="dot dot-unknown"></span>
+    <span id="status-text">Gres</span>
+    <span id="clock"></span>
+  </div>
+
+  <!-- Pages -->
+  <div id="app">
+
+    <!-- HOME -->
+    <div id="page-home" class="page active">
+      <div class="page-header">
+        <div class="page-title">Home</div>
+        <div class="page-subtitle" id="home-greeting"></div>
+      </div>
+      <div class="page-content">
+        <div class="empty-state" id="home-empty">
+          <div class="empty-icon">⬡</div>
+          <div class="empty-title">No widgets</div>
+          <div class="empty-desc">Add widgets from other sections to display them here</div>
+        </div>
+        <div id="home-widgets" class="widget-grid"></div>
+      </div>
+    </div>
+
+    <!-- SMART HOME -->
+    <div id="page-smarthome" class="page">
+      <div class="page-header">
+        <div class="page-title">Smart Home</div>
+        <div class="page-subtitle" id="smarthome-subtitle">Devices</div>
+      </div>
+      <div class="page-content">
+        <div id="smarthome-loading" class="loading-state">
+          <div class="spinner"></div>
+          <div>Retrieving devices...</div>
+        </div>
+        <div id="smarthome-error" class="error-state hidden">
+          <div class="error-icon">⚠</div>
+          <div id="smarthome-error-msg">Connection error</div>
+          <button class="btn-retry" id="smarthome-retry">Retry</button>
+        </div>
+        <div id="smarthome-content" class="hidden"></div>
+      </div>
+    </div>
+
+    <!-- METEO -->
+    <div id="page-meteo" class="page">
+      <div class="page-header">
+        <div class="page-title">Weather</div>
+        <div class="page-subtitle" id="weather-subtitle">Forecast</div>
+      </div>
+      <div class="page-content">
+        <div id="weather-loading" class="loading-state">
+          <div class="spinner"></div>
+          <div>Loading forecast...</div>
+        </div>
+
+        <div id="weather-error" class="error-state hidden">
+          <div class="error-icon">⚠</div>
+          <div id="weather-error-msg">Unable to load weather</div>
+          <button class="btn-retry" id="weather-retry">Retry</button>
+        </div>
+
+        <div id="weather-content" class="hidden">
+          <div class="weather-top-actions">
+            <button id="weather-other-location" class="btn-secondary">Other location</button>
+          </div>
+
+          <div id="weather-search-panel" class="weather-search-panel hidden">
+            <input type="search" id="weather-search-input" class="form-input" placeholder="Search location...">
+            <div id="weather-search-results" class="weather-search-results"></div>
+          </div>
+
+          <div class="weather-now-card">
+            <div class="weather-now-main">
+              <div class="weather-now-city" id="weather-city">—</div>
+              <div class="weather-now-temp" id="weather-current-temp">--°</div>
+              <div class="weather-now-desc" id="weather-current-desc">—</div>
+            </div>
+            <div class="weather-now-side">
+              <div class="weather-now-line"><span>Humidity</span><strong id="weather-current-humidity">—</strong></div>
+              <div class="weather-now-line"><span>Wind</span><strong id="weather-current-wind">—</strong></div>
+            </div>
+          </div>
+
+          <div class="weather-highlight-grid">
+            <div class="weather-day-card">
+              <div class="weather-day-label">Today</div>
+              <div class="weather-day-temp"><span id="weather-today-max">--°</span><small id="weather-today-min">--°</small></div>
+              <div class="weather-day-desc" id="weather-today-desc">—</div>
+            </div>
+            <div class="weather-day-card">
+              <div class="weather-day-label">Tomorrow</div>
+              <div class="weather-day-temp"><span id="weather-tomorrow-max">--°</span><small id="weather-tomorrow-min">--°</small></div>
+              <div class="weather-day-desc" id="weather-tomorrow-desc">—</div>
+            </div>
+          </div>
+
+          <div class="weather-chart-block">
+            <div class="section-label">Temperature trend · 10 days</div>
+            <div id="weather-temp-chart" class="weather-chart"></div>
+          </div>
+
+          <div class="section-label">Next 10 days</div>
+          <div id="weather-days-list" class="weather-days-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SERVER / PROXMOX -->
+    <div id="page-server" class="page">
+      <div class="page-header">
+        <div class="page-title">Server</div>
+        <div class="page-subtitle" id="px-subtitle">Proxmox VE</div>
+      </div>
+
+      <!-- Split layout: sidebar + detail -->
+      <div class="px-layout">
+
+        <!-- LEFT: tree sidebar -->
+        <div class="px-sidebar" id="px-sidebar">
+          <div id="px-tree-loading" class="px-tree-loading">
+            <div class="spinner"></div>
+          </div>
+          <div id="px-tree-error" class="px-tree-error hidden">
+            <div class="error-icon">⚠</div>
+            <div id="px-tree-error-msg"></div>
+            <button class="btn-retry" id="px-retry">Retry</button>
+          </div>
+          <div id="px-tree" class="hidden"></div>
+        </div>
+
+        <!-- RIGHT: detail panel -->
+        <div class="px-detail" id="px-detail">
+          <div class="px-detail-empty" id="px-detail-empty">
+            <div class="px-detail-empty-icon">◈</div>
+            <div class="px-detail-empty-text">Select an item</div>
+          </div>
+          <div id="px-detail-content" class="hidden"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MARKETS -->
+    <div id="page-markets" class="page">
+      <div class="page-header">
+        <div class="page-title">Markets</div>
+        <div class="page-subtitle" id="markets-subtitle">Favorites</div>
+      </div>
+      <div class="page-content">
+        <div class="markets-search-wrap">
+          <input type="search" id="mk-search" class="form-input" placeholder="Search title or symbol...">
+          <div id="mk-search-results" class="markets-search-results"></div>
+        </div>
+
+        <div id="mk-loading" class="loading-state hidden">
+          <div class="spinner"></div>
+          <div>Loading titles...</div>
+        </div>
+        <div id="mk-error" class="error-state hidden">
+          <div class="error-icon">⚠</div>
+          <div id="mk-error-msg">Market data loading error</div>
+          <button class="btn-retry" id="mk-retry">Retry</button>
+        </div>
+        <div id="mk-favorites" class="markets-favorites"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="page-settings" class="page">
+      <div class="page-header">
+        <div class="page-title">Settings</div>
+        <div class="page-subtitle">Configuration</div>
+      </div>
+      <div class="page-content">
+
+        <div class="settings-block">
+          <div class="settings-block-title">Home Assistant</div>
+          <div class="settings-block-desc">Connect your Home Assistant server to control smart devices.</div>
+
+          <div class="form-group">
+            <label class="form-label">Server URL</label>
+            <input type="url" id="ha-url" class="form-input" placeholder="http://homeassistant.local:8123">
+            <div class="form-hint">E.g: http://192.168.1.100:8123</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Long-Lived Access Token</label>
+            <div class="input-with-toggle">
+              <input type="password" id="ha-token" class="form-input" placeholder="Access token">
+              <button class="toggle-visibility" id="toggle-token" type="button">◉</button>
+            </div>
+            <div class="form-hint">Profile → Security → Long-Lived Access Tokens → Create token</div>
+          </div>
+
+          <div class="form-row">
+            <button id="btn-test-ha" class="btn-secondary">Test connection</button>
+            <button id="btn-save-ha" class="btn-primary">Save</button>
+          </div>
+
+          <div id="ha-test-result" class="test-result hidden"></div>
+        </div>
+
+        <div class="settings-block">
+          <div class="settings-block-title">Jellyfin</div>
+          <div class="settings-block-desc">Connect your Jellyfin server to browse the media library.</div>
+
+          <div class="form-group">
+            <label class="form-label">Server URL</label>
+            <input type="url" id="jf-url" class="form-input" placeholder="http://jellyfin.local:8096">
+            <div class="form-hint">E.g: http://192.168.1.100:8096</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">API Token</label>
+            <div class="input-with-toggle">
+              <input type="password" id="jf-token" class="form-input" placeholder="API Key">
+              <button class="toggle-visibility" id="toggle-jf-token" type="button">◉</button>
+            </div>
+            <div class="form-hint">Dashboard → API Keys → Create new key</div>
+          </div>
+
+          <div class="form-row">
+            <button id="btn-test-jf" class="btn-secondary">Test connection</button>
+            <button id="btn-save-jf" class="btn-primary">Save</button>
+          </div>
+
+          <div id="jf-test-result" class="test-result hidden"></div>
+        </div>
+
+        <div class="settings-block">
+          <div class="settings-block-title">Weather</div>
+          <div class="settings-block-desc">Set the default weather location. You can always use "Other location" in the Weather tab for a temporary search.</div>
+
+          <div class="form-group">
+            <label class="form-label">Search location</label>
+            <input type="search" id="wx-settings-search" class="form-input" placeholder="E.g: Milan, Rome, Turin">
+          </div>
+
+          <div id="wx-settings-results" class="weather-search-results"></div>
+          <div id="wx-settings-selected" class="form-hint">No location selected.</div>
+
+          <div class="form-row">
+            <button id="wx-save-default" class="btn-primary">Save default location</button>
+          </div>
+        </div>
+
+        <div class="settings-block">
+          <div class="settings-block-title">Proxmox</div>
+          <div class="settings-block-desc">Connect your Proxmox VE cluster to manage nodes and virtual machines.</div>
+
+          <div class="form-group">
+            <label class="form-label">Server URL</label>
+            <input type="url" id="px-url" class="form-input" placeholder="https://proxmox.local:8006">
+            <div class="form-hint">E.g: https://192.168.1.10:8006</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">API Token ID</label>
+            <input type="text" id="px-tokenid" class="form-input" placeholder="root@pam!mytoken">
+            <div class="form-hint">Format: user@realm!tokenname</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">API Token Secret</label>
+            <div class="input-with-toggle">
+              <input type="password" id="px-token" class="form-input" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+              <button class="toggle-visibility" id="toggle-px-token" type="button">◉</button>
+            </div>
+            <div class="form-hint">Datacenter → Permissions → API Tokens</div>
+          </div>
+
+          <div class="form-row">
+            <button id="btn-test-px" class="btn-secondary">Test connection</button>
+            <button id="btn-save-px" class="btn-primary">Save</button>
+          </div>
+
+          <div id="px-test-result" class="test-result hidden"></div>
+        </div>
+
+        <div class="settings-block settings-block-placeholder">
+          <div class="settings-block-title">Notifications</div>
+          <div class="settings-block-desc settings-placeholder-text">Coming soon</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- JELLY -->
+    <div id="page-jelly" class="page">
+      <div class="page-header jelly-header">
+        <div class="jelly-header-top">
+          <div class="page-title">Jellyfin</div>
+          <div class="page-subtitle" id="jelly-subtitle">Library</div>
+        </div>
+        <!-- Filters bar -->
+        <div class="jelly-filters">
+          <select id="jf-type" class="jf-select">
+            <option value="Movie">Movies</option>
+            <option value="Series">TV Series</option>
+          </select>
+          <select id="jf-sort" class="jf-select">
+            <option value="SortName">A → Z</option>
+            <option value="DateCreated">Recent</option>
+            <option value="CommunityRating">Rating</option>
+            <option value="ProductionYear">Year</option>
+          </select>
+          <select id="jf-pagesize" class="jf-select">
+            <option value="12">12</option>
+            <option value="24" selected>24</option>
+            <option value="48">48</option>
+            <option value="96">96</option>
+          </select>
+        </div>
+        <!-- Search -->
+        <div class="jelly-search-row">
+          <input type="search" id="jf-search" class="jf-search-input" placeholder="Search title…">
+        </div>
+      </div>
+
+      <div class="page-content">
+        <div id="jelly-loading" class="loading-state">
+          <div class="spinner"></div>
+          <div>Loading library…</div>
+        </div>
+        <div id="jelly-error" class="error-state hidden">
+          <div class="error-icon">⚠</div>
+          <div id="jelly-error-msg">Connection error</div>
+          <button class="btn-retry" id="jelly-retry">Retry</button>
+        </div>
+        <div id="jelly-content" class="hidden">
+          <div id="jelly-grid" class="jelly-grid"></div>
+          <!-- Pagination -->
+          <div class="jelly-pagination" id="jelly-pagination">
+            <button class="jf-pag-btn" id="jf-prev">‹ Prev</button>
+            <span class="jf-pag-info" id="jf-pag-info">1 / 1</span>
+            <button class="jf-pag-btn" id="jf-next">Next ›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Jelly detail overlay -->
+  <div id="jelly-detail" class="jelly-detail-overlay hidden">
+    <div class="jelly-detail-inner">
+      <button class="jelly-back-btn" id="jelly-back">‹ Back</button>
+      <div class="jelly-detail-poster-wrap">
+        <img id="jelly-detail-img" class="jelly-detail-poster" src="" alt="">
+      </div>
+      <div class="jelly-detail-body">
+        <div class="jelly-detail-year-genre" id="jelly-detail-meta"></div>
+        <div class="jelly-detail-title" id="jelly-detail-title"></div>
+        <div class="jelly-detail-rating" id="jelly-detail-rating"></div>
+        <button id="jelly-play-btn" class="jelly-play-btn hidden" type="button">▶ Play</button>
+        <div class="jelly-detail-overview" id="jelly-detail-overview"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Markets detail overlay -->
+  <div id="mk-detail" class="jelly-detail-overlay hidden">
+    <div class="jelly-detail-inner">
+      <button class="jelly-back-btn" id="mk-back">‹ Back</button>
+      <div class="mk-detail-head">
+        <div class="mk-head-left">
+          <div class="mk-symbol" id="mk-detail-symbol">—</div>
+          <div class="mk-name" id="mk-detail-name">—</div>
+        </div>
+        <button id="mk-fav-toggle" class="mk-fav-toggle" type="button">☆</button>
+      </div>
+      <div class="mk-price-line">
+        <span id="mk-detail-price">—</span>
+        <span id="mk-detail-change">—</span>
+      </div>
+      <div class="mk-range-row">
+        <button class="mk-range-btn active" data-range="1d">1D</button>
+        <button class="mk-range-btn" data-range="1wk">1W</button>
+        <button class="mk-range-btn" data-range="1mo">1M</button>
+        <button class="mk-range-btn" data-range="1y">1Y</button>
+        <button class="mk-range-btn" data-range="5y">5Y</button>
+      </div>
+      <div id="mk-chart" class="mk-chart"></div>
+      <div class="mk-info-grid">
+        <div class="mk-info-item">
+          <div class="mk-info-label">Day Low</div>
+          <div class="mk-info-value" id="mk-day-low">—</div>
+        </div>
+        <div class="mk-info-item">
+          <div class="mk-info-label">Day High</div>
+          <div class="mk-info-value" id="mk-day-high">—</div>
+        </div>
+        <div class="mk-info-item">
+          <div class="mk-info-label">Volume</div>
+          <div class="mk-info-value" id="mk-volume">—</div>
+        </div>
+        <div class="mk-info-item">
+          <div class="mk-info-label">Market Cap</div>
+          <div class="mk-info-value" id="mk-market-cap">—</div>
+        </div>
+        <div class="mk-info-item">
+          <div class="mk-info-label">P/E Ratio</div>
+          <div class="mk-info-value" id="mk-pe-ratio">—</div>
+        </div>
+        <div class="mk-info-item">
+          <div class="mk-info-label">Dividend</div>
+          <div class="mk-info-value" id="mk-dividend-yield">—</div>
+        </div>
+        <div class="mk-info-item">
+          <div class="mk-info-label">52W Low</div>
+          <div class="mk-info-value" id="mk-52w-low">—</div>
+        </div>
+        <div class="mk-info-item">
+          <div class="mk-info-label">52W High</div>
+          <div class="mk-info-value" id="mk-52w-high">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="light-sheet-backdrop">
+    <div id="light-sheet">
+      <div class="sheet-handle"></div>
+
+      <div class="sheet-header">
+        <div class="sheet-color-dot" id="sheet-color-dot"></div>
+        <div class="sheet-title" id="sheet-title">Light</div>
+        <button class="sheet-close" id="sheet-close">×</button>
+      </div>
+
+      <!-- Power -->
+      <div class="sheet-power-row">
+        <div class="sheet-power-label" id="sheet-power-label">Off</div>
+        <div class="power-toggle" id="sheet-power-toggle">
+          <div class="power-knob"></div>
+        </div>
+      </div>
+
+      <!-- Brightness -->
+      <div class="sheet-control" id="ctrl-brightness">
+        <div class="sheet-control-header">
+          <div class="sheet-control-label">Brightness</div>
+          <div class="sheet-control-value" id="val-brightness">—</div>
+        </div>
+        <input type="range" class="sheet-slider slider-brightness"
+               id="slider-brightness" min="1" max="255" value="255">
+      </div>
+
+      <!-- Color temperature -->
+      <div class="sheet-control" id="ctrl-colortemp">
+        <div class="sheet-control-header">
+          <div class="sheet-control-label">Color temperature</div>
+          <div class="sheet-control-value" id="val-colortemp">—</div>
+        </div>
+        <input type="range" class="sheet-slider slider-colortemp"
+               id="slider-colortemp" min="153" max="500" value="300">
+      </div>
+
+      <!-- Color wheel -->
+      <div class="sheet-colorwheel-wrap" id="ctrl-color">
+        <div class="sheet-colorwheel-header">
+          <div class="sheet-control-label">Color</div>
+          <div class="sheet-control-value" id="val-color">—</div>
+        </div>
+        <div class="colorwheel-wrap-inner">
+          <canvas id="light-color-canvas" width="240" height="240"></canvas>
+          <div class="colorwheel-cursor" id="colorwheel-cursor"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Tab Bar -->
+  <nav id="tab-bar">
+    <button class="tab active" data-page="home">
+      <span class="tab-icon">⌂</span>
+      <span class="tab-label">Home</span>
+    </button>
+    <button class="tab" data-page="smarthome">
+      <span class="tab-icon">◈</span>
+      <span class="tab-label">Smart</span>
+    </button>
+    <button class="tab" data-page="jelly">
+      <span class="tab-icon">▶</span>
+      <span class="tab-label">Jelly</span>
+    </button>
+    <button class="tab" data-page="meteo">
+      <span class="tab-icon">◎</span>
+      <span class="tab-label">Weather</span>
+    </button>
+    <button class="tab" data-page="markets">
+      <span class="tab-icon">◬</span>
+      <span class="tab-label">Markets</span>
+    </button>
+    <button class="tab" data-page="server">
+      <span class="tab-icon">⬡</span>
+      <span class="tab-label">Server</span>
+    </button>
+    <button class="tab" data-page="settings">
+      <span class="tab-icon">⚙</span>
+      <span class="tab-label">Settings</span>
+    </button>
+  </nav>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.4/chartist.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
