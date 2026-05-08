@@ -81,7 +81,7 @@ html, body {
 }
 
 .device-card {
-  width: calc(50% - 8px);
+  width: calc(25% - 8px);
   margin: 4px;
   min-height: 110px;
   border-radius: 16px;
@@ -454,17 +454,26 @@ html, body {
   padding: 8px 4px 2px;
 }
 .mk-info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-flex-wrap: wrap;
+  flex-wrap: wrap;
   margin: 18px 14px 0;
 }
 .mk-info-item {
+  width: calc(50% - 7px);
+  margin: 0 14px 12px 0;
   background: #0f0f0f;
   border: 1px solid #1f1f1f;
   border-radius: 8px;
   padding: 10px;
   text-align: center;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+.mk-info-item:nth-child(even) {
+  margin-right: 0;
 }
 .mk-info-label {
   font-size: 10px;
@@ -504,6 +513,122 @@ html, body {
 .settings-block-title { font-size: 14px; font-weight: 500; color: #dddded; margin-bottom: 4px; }
 .settings-block-desc  { font-size: 12px; color: #b1b1bb; line-height: 1.5; margin-bottom: 18px; }
 .settings-placeholder-text { margin-bottom: 0; font-style: italic; }
+
+/* ── feature accordion ─────────────────────────────── */
+.feat-accordion {
+  border-bottom: 1px solid #1e1e1e;
+}
+.feat-accordion:last-child { border-bottom: none; }
+
+.feat-acc-header {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 11px 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.feat-acc-left {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 8px;
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  min-width: 0;
+}
+.feat-acc-chevron {
+  font-size: 16px; color: #555568; width: 14px; text-align: center;
+  display: inline-block;
+  -webkit-transition: -webkit-transform 0.2s; transition: transform 0.2s;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.feat-accordion.open .feat-acc-chevron {
+  -webkit-transform: rotate(90deg); transform: rotate(90deg);
+}
+.feat-acc-label {
+  font-size: 13px; color: #c5c5d4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.feature-row-icon {
+  font-size: 13px; color: #7a7aff;
+  width: 16px; height: 16px; text-align: center;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+}
+.feature-row-icon svg { display: block; }
+
+/* accordion body */
+.feat-acc-body {
+  padding-bottom: 10px;
+}
+.feat-acc-body.hidden { display: none; }
+
+.feat-acc-loading {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  padding: 14px 0;
+}
+.feat-acc-loading.hidden { display: none; }
+
+.spinner-sm {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid #2a2a3a; border-top-color: #7a7aff;
+  -webkit-animation: spin 0.7s linear infinite; animation: spin 0.7s linear infinite;
+}
+
+/* widget items inside accordion */
+.feat-acc-list { padding: 2px 0 4px; }
+
+.feat-widget-group-label {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #555568;
+  padding: 8px 0 4px;
+}
+.feat-widget-item {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid #161616;
+}
+.feat-widget-item:last-child { border-bottom: none; }
+.feat-widget-item-left {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 8px; min-width: 0;
+}
+.feat-widget-item-icon { font-size: 12px; color: #555568; width: 14px; text-align: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.feat-widget-item-name {
+  font-size: 12px; color: #a0a0b4;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.feat-widget-add-btn {
+  background: none; border: 1px solid #2e2e42; border-radius: 6px;
+  color: #7a7aff; font-size: 14px; line-height: 1;
+  width: 24px; height: 24px; cursor: pointer;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  -webkit-transition: background 0.15s, border-color 0.15s; transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.feat-widget-add-btn.added {
+  background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.5);
+  color: #a5a8ff;
+}
+.feat-widget-empty {
+  font-size: 12px; color: #444456; padding: 10px 0 6px; font-style: italic;
+}
+.feat-single-add {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 8px 0 4px;
+}
+.feat-single-add-label { font-size: 12px; color: #a0a0b4; }
 
 .form-group { margin-bottom: 14px; }
 .form-label {
@@ -593,13 +718,216 @@ html, body {
   padding: 6px 2px;
 }
 .tab:active { opacity: 0.5; }
-.tab-icon  { font-size: 16px; color: #8d8d99; line-height: 1; margin-bottom: 3px; -webkit-transition: color 0.18s; transition: color 0.18s; }
-.tab-label { font-size: 9px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #8d8d99; -webkit-transition: color 0.18s; transition: color 0.18s; }
-.tab.active .tab-icon  { color: #c6c6ff; }
-.tab.active .tab-label { color: #c6c6ff; }
+.tab-icon {
+  width: 20px; height: 20px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  margin-bottom: 3px;
+  color: #636370;
+  -webkit-transition: color 0.18s; transition: color 0.18s;
+}
+.tab-icon svg { display: block; }
+.tab-label { font-size: 9px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #636370; -webkit-transition: color 0.18s; transition: color 0.18s; }
+.tab.active .tab-icon  { color: #b8b8ff; }
+.tab.active .tab-label { color: #b8b8ff; }
 
 /* ── Home widgets ───────────────────────────────────── */
-.widget-grid { padding: 16px; }
+.widget-grid { padding: 0 0 24px; }
+
+.hw-section-label {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #9a9aa4;
+  padding: 22px 16px 10px;
+}
+
+/* ── Smart Home device widget ───────────────────────── */
+/* reuses .devices-grid and .device-card */
+
+/* ── Side-by-side row (Jellyfin + Weather) ──────────── */
+.hw-pair-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  padding: 0 12px;
+  gap: 8px;
+  margin-bottom: 4px;
+  height: 220px;
+}
+.hw-pair-col {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  min-width: 0;
+}
+
+/* ── Jellyfin widget ────────────────────────────────── */
+.hw-jelly-card {
+  border-radius: 16px;
+  background: #101010;
+  border: 1px solid #1f1f1f;
+  overflow: hidden;
+  cursor: pointer;
+  height: 100%;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-transition: opacity 0.12s; transition: opacity 0.12s;
+}
+.hw-jelly-card:active { opacity: 0.7; }
+
+.hw-jelly-posters {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  height: 170px;
+  overflow: hidden;
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+}
+.hw-jelly-poster {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  background: #0a0a0f center no-repeat;
+  position: relative;
+  background-size: contain;
+}
+.hw-jelly-poster + .hw-jelly-poster {
+  border-left: 2px solid #0a0a0f;
+}
+.hw-jelly-poster-fallback {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  font-size: 18px; color: #2a2a38; background: #10101860;
+}
+.hw-jelly-poster-title {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: -webkit-linear-gradient(top, transparent, rgba(0,0,0,0.85));
+  background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.85));
+  padding: 14px 4px 4px;
+  font-size: 8px; color: #ccc; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hw-jelly-meta {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 8px 10px;
+}
+.hw-jelly-meta-left {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 5px; min-width: 0;
+}
+.hw-jelly-icon  { font-size: 13px; color: #7a7aff; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.hw-jelly-title { font-size: 12px; font-weight: 500; color: #c5c5d4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hw-jelly-counts { font-size: 10px; color: #666678; white-space: nowrap; }
+.hw-jelly-arrow { font-size: 14px; color: #3a3a52; -webkit-flex-shrink: 0; flex-shrink: 0; }
+
+/* ── Weather widget ─────────────────────────────────── */
+.hw-wx-card {
+  border-radius: 16px;
+  background: radial-gradient(circle at 85% 15%, rgba(160,160,255,0.13) 0%, rgba(160,160,255,0) 55%), #101010;
+  border: 1px solid #1f1f1f;
+  overflow: hidden;
+  cursor: pointer;
+  height: 100%;
+  box-sizing: border-box;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  padding: 10px 11px 10px 10px;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-transition: opacity 0.12s; transition: opacity 0.12s;
+}
+.hw-wx-card:active { opacity: 0.7; }
+
+/* top bar: pin icon + location name, right-aligned */
+.hw-wx-topbar {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: end; -webkit-justify-content: flex-end; justify-content: flex-end;
+  gap: 3px;
+  margin-bottom: 4px;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.hw-wx-pin { font-size: 10px; color: #7a7aff; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.hw-wx-loc {
+  font-size: 9px; color: #8888a0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 90%;
+}
+
+/* main row: fills remaining vertical space */
+.hw-wx-main {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  width: 100%;
+}
+/* large weather icon */
+.hw-wx-icon {
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  width: 42px; height: 42px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  margin-right: 7px;
+}
+/* current temperature — big */
+.hw-wx-temp {
+  font-size: 30px; font-weight: 300; color: #f5f5ff; line-height: 1;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  margin-right: 9px;
+}
+/* min / max stacked */
+.hw-wx-range-col {
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  gap: 3px;
+  margin-right: 9px;
+}
+.hw-wx-range-max { font-size: 12px; font-weight: 500; color: #e0e0f8; }
+.hw-wx-range-min { font-size: 11px; color: #555568; }
+/* humidity pushed to far right */
+.hw-wx-humidity-col {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-box-align: end; -webkit-align-items: flex-end; align-items: flex-end;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  gap: 2px;
+}
+.hw-wx-hum-label { font-size: 9px; color: #555568; text-transform: uppercase; letter-spacing: 0.05em; }
+.hw-wx-hum-val   { font-size: 14px; color: #9090c0; font-weight: 500; }
+
+.hw-wx-na { font-size: 11px; color: #555568; text-align: center; width: 100%; padding: 8px 0; }
+/* ── Weather icon SVG (used in tab too) ─────────────── */
+/* icons are inline SVG injected by JS — these rules style them */
+.wx-icon { display: inline-block; vertical-align: middle; }
+.wx-icon svg { display: block; }
+
+/* ── Weather tab: icon in day rows ─────────────────── */
+.weather-day-row { position: relative; }
+.weather-day-icon {
+  width: 22px; height: 22px; margin-right: 8px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.weather-day-icon svg { width: 18px; height: 18px; }
+
+/* weather day card icon */
+.weather-day-card-icon {
+  margin-bottom: 6px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+}
+.weather-day-card-icon svg { width: 26px; height: 26px; }
+
+/* precip badge in day rows */
+.weather-day-precip {
+  font-size: 10px; color: #7a7aaa;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 2px; margin-left: 4px;
+}
+.weather-day-precip svg { width: 9px; height: 9px; }
 
 /* ── Utilities ──────────────────────────────────────── */
 .hidden { display: none !important; }
@@ -1145,9 +1473,14 @@ html, body {
 .px-item-icon {
   font-size: 12px; color: #8a8a98;
   margin-right: 8px; -webkit-flex-shrink: 0; flex-shrink: 0;
-  width: 14px; text-align: center;
+  width: 14px; height: 14px; text-align: center;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
 }
+.px-item-icon svg { display: block; }
 .px-tree-item.selected .px-item-icon { color: #d7d7ff; }
+.px-tree-item.selected .px-item-icon svg { stroke: #d7d7ff; }
 
 .px-item-body { min-width: 0; -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; }
 .px-item-name {
@@ -1353,3 +1686,553 @@ html, body {
 .px-confirm-btns .btn-secondary,
 .px-confirm-btns .btn-primary { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; padding: 10px; }
 .px-confirm-btns .btn-primary.danger { background: #8a2020; color: #ffaaaa; }
+
+/* ═══════════════════════════════════════════════════════
+   HOME SCREEN — Redesign
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Header ─────────────────────────────────────────── */
+.home-header {
+  padding: 28px 18px 0;
+  position: -webkit-sticky; position: sticky; top: 0;
+  background: #040404;
+  z-index: 10;
+}
+.home-header-top {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: flex-start; -webkit-align-items: flex-start; align-items: flex-start;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #161616;
+}
+.home-greeting-block {}
+.home-greeting {
+  font-size: 26px; font-weight: 300; letter-spacing: -0.03em;
+  color: #ececf5; line-height: 1;
+}
+.home-date {
+  font-size: 12px; color: #55556a; margin-top: 6px;
+  font-family: 'DM Mono', monospace; letter-spacing: 0.04em;
+}
+.home-status-dot-wrap {
+  padding-top: 4px;
+}
+.home-ha-dot {
+  display: block; width: 8px; height: 8px; border-radius: 50%;
+}
+.home-ha-dot--ok      { background: #3ddc84; }
+.home-ha-dot--err     { background: #ff5f57; }
+.home-ha-dot--unknown { background: #2a2a44; }
+
+/* ── Content area ───────────────────────────────────── */
+.home-content {
+  padding: 14px 0 32px;
+}
+
+/* ── Glance row (Jelly + Weather side-by-side) ──────── */
+.home-glance-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  padding: 0 14px;
+  gap: 10px;
+  margin-bottom: 12px;
+  min-height: 0;
+}
+/* each column inside the glance row */
+.home-glance-col {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  min-width: 0;
+}
+/* If only one card is rendered, let it fill width */
+.home-glance-row.solo .home-glance-col {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+}
+
+/* ── Empty state ────────────────────────────────────── */
+.home-empty {
+  display: none;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  padding: 36px 24px 20px;
+  text-align: center;
+}
+.home-empty.visible { display: -webkit-box; display: -webkit-flex; display: flex; }
+.home-empty-icon    { margin-bottom: 16px; opacity: 0.5; }
+.home-empty-title   { font-size: 14px; font-weight: 400; color: #5a5a72; margin-bottom: 6px; }
+.home-empty-desc    { font-size: 12px; color: #404054; line-height: 1.6; }
+
+/* ── Placeholder row (future widgets) ───────────────── */
+.home-placeholder-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  padding: 0 14px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.home-placeholder-card {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  background: #0b0b0e;
+  border: 1px dashed #1e1e2e;
+  border-radius: 16px;
+  padding: 16px 12px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start;
+  min-height: 90px;
+}
+.home-placeholder-card-icon { margin-bottom: 10px; opacity: 0.5; }
+.home-placeholder-card-label {
+  font-size: 12px; font-weight: 500; color: #383850;
+  margin-bottom: 3px; line-height: 1.2;
+}
+.home-placeholder-card-sub {
+  font-size: 10px; color: #27273a; letter-spacing: 0.04em;
+  text-transform: uppercase; font-weight: 500;
+}
+
+/* ── Section (Smart Home tiles on home) ─────────────── */
+.home-section { padding: 0 0 4px; }
+.home-section.hidden { display: none; }
+.home-section-label {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #44445a;
+  padding: 18px 18px 10px;
+}
+
+/* ── Widget grid (reuse existing device cards) ──────── */
+/* device cards in home use the existing .devices-grid + .device-card rules */
+/* just ensure the grid padding matches home layout */
+#home-smarthome-grid {
+  padding: 0 10px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   APPEARANCE SETTINGS ROWS
+   ═══════════════════════════════════════════════════════ */
+.appearance-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 11px 0;
+  border-bottom: 1px solid #1e1e1e;
+}
+.appearance-row:last-child { border-bottom: none; }
+.appearance-row-left {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 10px;
+}
+.appearance-row-icon {
+  width: 16px; height: 16px; color: #7a7aff;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.appearance-row-icon svg { display: block; }
+.appearance-row-label {
+  font-size: 13px; color: #c5c5d4;
+}
+
+/* Status bar hide/show transition */
+#status-bar {
+  -webkit-transition: height 0.25s, opacity 0.25s, padding 0.25s;
+  transition: height 0.25s, opacity 0.25s, padding 0.25s;
+}
+#status-bar.hidden-bar {
+  height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  border-bottom: none !important;
+}
+/* When status bar is hidden, app shifts up */
+body.statusbar-hidden #app {
+  top: 0;
+}
+body.statusbar-hidden .home-header {
+  padding-top: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LIGHT THEME
+   Applied by adding class "light" to <html> element.
+   All selectors prefixed with html.light to override dark.
+   ═══════════════════════════════════════════════════════ */
+
+html.light,
+html.light body {
+  background: #f0f0f5;
+  color: #18181f;
+}
+
+/* Status bar */
+html.light #status-bar {
+  background: #e8e8ef;
+  border-bottom-color: #d0d0da;
+}
+html.light #status-text { color: #5a5a6e; }
+html.light #clock        { color: #6a6a7e; }
+
+/* App bg */
+html.light #app { background: #f0f0f5; }
+
+/* Pages */
+html.light .page { background: #f0f0f5; }
+
+/* Page header */
+html.light .page-header {
+  background: #eaeaef;
+  border-bottom-color: #d2d2dc;
+}
+html.light .page-title   { color: #12121a; }
+html.light .page-subtitle { color: #707085; }
+html.light .section-label { color: #7070880; }
+
+/* Tab bar */
+html.light #tab-bar {
+  background: #e8e8ef;
+  border-top-color: #d0d0da;
+}
+html.light .tab-icon  { color: #9090a4; }
+html.light .tab-label { color: #9090a4; }
+html.light .tab.active .tab-icon  { color: #4040cc; }
+html.light .tab.active .tab-label { color: #4040cc; }
+
+/* Home header */
+html.light .home-header { background: #f0f0f5; border-bottom-color: #d8d8e2; }
+html.light .home-header-top { border-bottom-color: #d8d8e2; }
+html.light .home-greeting { color: #14141c; }
+html.light .home-date     { color: #9090a8; }
+
+/* Home placeholder cards */
+html.light .home-placeholder-card {
+  background: #e8e8f0;
+  border-color: #c8c8d8;
+}
+html.light .home-placeholder-card-label { color: #9090a8; }
+html.light .home-placeholder-card-sub   { color: #b0b0c0; }
+html.light .home-placeholder-card-icon  { opacity: 0.4; }
+
+/* Home empty */
+html.light .home-empty-title { color: #9090a8; }
+html.light .home-empty-desc  { color: #b0b0c0; }
+
+/* Section labels */
+html.light .home-section-label { color: #8080a0; }
+html.light .hw-section-label   { color: #8080a0; }
+
+/* Device cards */
+html.light .device-card {
+  background: #e2e2ea;
+  border-color: #c8c8d4;
+}
+html.light .device-card.on {
+  background: #18183a;
+  border-color: #2a2a60;
+}
+html.light .card-icon  { color: #9090a8; }
+html.light .card-name  { color: #28283a; }
+html.light .card-state { color: #7878a0; }
+html.light .device-card.on .card-icon  { color: #a0a0ff; }
+html.light .device-card.on .card-name  { color: #e0e0f8; }
+html.light .device-card.on .card-state { color: #8080d0; }
+
+/* Jellyfin widget card */
+html.light .hw-jelly-card {
+  background: #e2e2ea;
+  border-color: #c8c8d4;
+}
+html.light .hw-jelly-poster     { background-color: #ccccda; }
+html.light .hw-jelly-poster-fallback { color: #9090a8; }
+html.light .hw-jelly-title      { color: #28283a; }
+html.light .hw-jelly-counts     { color: #9090a8; }
+html.light .hw-jelly-arrow      { color: #c0c0d0; }
+
+/* Weather widget card */
+html.light .hw-wx-card {
+  background: #e4e4f0;
+  border-color: #c8c8d8;
+}
+html.light .hw-wx-temp      { color: #14141c; }
+html.light .hw-wx-range-max { color: #28283a; }
+html.light .hw-wx-range-min { color: #a0a0b8; }
+html.light .hw-wx-hum-label { color: #a0a0b8; }
+html.light .hw-wx-hum-val   { color: #5050b0; }
+html.light .hw-wx-loc       { color: #9090a8; }
+html.light .hw-wx-pin       { color: #6060cc; }
+html.light .hw-wx-na        { color: #a0a0b8; }
+
+/* Weather page */
+html.light .weather-now-card {
+  background: #e4e4f2;
+  border-color: #c8c8dc;
+}
+html.light .weather-now-city { color: #5050688; }
+html.light .weather-now-temp { color: #12121a; }
+html.light .weather-now-desc { color: #50506c; }
+html.light .weather-now-line { color: #7878a0; }
+html.light .weather-now-line strong { color: #1a1a28; }
+html.light .weather-day-card {
+  background: #e4e4f0;
+  border-color: #c8c8dc;
+}
+html.light .weather-day-label { color: #8888a4; }
+html.light .weather-day-temp span { color: #1a1a28; }
+html.light .weather-day-temp small { color: #9090a8; }
+html.light .weather-day-desc { color: #5858728; }
+html.light .weather-chart {
+  background: #e0e0e8;
+  border-color: #c8c8d8;
+}
+html.light .weather-days-list {
+  background: #e4e4ec;
+  border-color: #c8c8d8;
+}
+html.light .weather-day-row { border-bottom-color: #d0d0da; }
+html.light .weather-day-name { color: #22222e; }
+html.light .weather-day-summary { color: #6868888; }
+html.light .weather-day-range { color: #14141c; }
+html.light .btn-secondary {
+  background: #dcdce8;
+  border-color: #c0c0d0;
+  color: #28283a;
+}
+
+/* Markets */
+html.light .mk-row {
+  background: #e2e2ea;
+  border-color: #c8c8d4;
+}
+html.light .mk-symbol { color: #14141c; }
+html.light .mk-name   { color: #8080a0; }
+html.light .mk-price  { color: #1a1a28; }
+html.light .markets-search-wrap .form-input,
+html.light .form-input {
+  background: #dcdce8;
+  border-color: #b8b8cc;
+  color: #14141c;
+}
+html.light .form-input::-webkit-input-placeholder { color: #a0a0b8; }
+html.light .form-hint { color: #8888a4; }
+html.light .form-label { color: #7878a0; }
+
+/* Settings */
+html.light .settings-block {
+  background: #e4e4ec;
+  border-color: #c8c8d8;
+}
+html.light .settings-block-title { color: #1a1a28; }
+html.light .settings-block-desc  { color: #8080a0; }
+html.light .appearance-row       { border-bottom-color: #d0d0da; }
+html.light .appearance-row-label { color: #28283a; }
+html.light .appearance-row-icon  { color: #5050c8; }
+html.light .feature-row-icon     { color: #5050c8; }
+
+/* feat accordion */
+html.light .feat-accordion { border-bottom-color: #d0d0da; }
+html.light .feat-acc-chevron { color: #9090a8; }
+html.light .feat-acc-label   { color: #28283a; }
+html.light .feat-widget-item { border-bottom-color: #d0d0da; }
+html.light .feat-widget-item-name { color: #50507a; }
+html.light .feat-widget-group-label { color: #9090a8; }
+html.light .feat-widget-empty { color: #a0a0b8; }
+html.light .feat-widget-add-btn {
+  border-color: #b0b0d0;
+  color: #5050c8;
+}
+html.light .feat-widget-add-btn.added {
+  background: rgba(80,80,200,0.12);
+  border-color: rgba(80,80,200,0.4);
+  color: #4040aa;
+}
+
+/* power-toggle in light theme */
+html.light .power-toggle {
+  background: #d0d0de;
+  border-color: #b8b8cc;
+}
+html.light .power-toggle.on {
+  background: rgba(80,80,200,0.3);
+  border-color: rgba(80,80,200,0.5);
+}
+html.light .power-knob { background: #f0f0f8; }
+html.light .power-toggle.on .power-knob { background: #5050cc; }
+
+/* Proxmox */
+html.light .px-sidebar { border-right-color: #d0d0da; background: #ebebf2; }
+html.light .px-group-header { color: #9090a8; }
+html.light .px-tree-item { border-left-color: transparent; }
+html.light .px-tree-item:active { background: #dcdce8; }
+html.light .px-tree-item.selected {
+  background: #e0e0f0;
+  border-left-color: #6060cc;
+}
+html.light .px-item-name { color: #28283a; }
+html.light .px-item-meta { color: #8080a0; }
+html.light .px-item-icon { color: #9090b0; }
+html.light .px-tree-item.selected .px-item-icon { color: #5050c8; }
+html.light .px-tree-item.selected .px-item-name { color: #10101a; }
+html.light .px-detail-empty-text { color: #9090a8; }
+html.light .px-detail-header { border-bottom-color: #d0d0da; }
+html.light .px-detail-name { color: #12121a; }
+html.light .px-detail-type { color: #9090a8; }
+html.light .px-stat-card {
+  background: #e0e0ea;
+  border-color: #c8c8d8;
+}
+html.light .px-stat-label { color: #8080a0; }
+html.light .px-stat-value { color: #14141c; }
+html.light .px-stat-sub   { color: #9090a8; }
+html.light .px-bar-wrap   { background: #c8c8d8; }
+html.light .px-chart-label { color: #8080a0; }
+html.light .px-chart-wrap  { background: #dcdce8; }
+html.light .px-storage-name { color: #1a1a28; }
+html.light .px-storage-type { color: #9090a8; }
+html.light .px-storage-bar-wrap { background: #c8c8d8; }
+html.light .px-storage-pct { color: #5050788; }
+html.light .px-detail { background: #f0f0f5; }
+
+/* Buttons */
+html.light .btn-primary  { background: #5050c8; color: #f8f8ff; }
+html.light .btn-retry {
+  border-color: #d0a0a0;
+  color: #a03030;
+}
+
+/* Toast */
+html.light #toast {
+  background: #f0f0f8;
+  border-color: #c8c8dc;
+  color: #1a1a2a;
+}
+
+/* Loading / error states */
+html.light .loading-state { color: #8080a0; }
+html.light .spinner {
+  border-color: #c0c0d0;
+  border-top-color: #5050c8;
+}
+html.light .spinner-sm {
+  border-color: #c0c0d0;
+  border-top-color: #5050c8;
+}
+html.light .error-icon { color: #c05050; }
+html.light .empty-icon { color: #9090a8; }
+html.light .empty-title { color: #505068; }
+html.light .empty-desc  { color: #8080a0; }
+
+/* Jelly overlays */
+html.light .jelly-detail-overlay {
+  background: #f0f0f5;
+}
+html.light .jelly-back-btn {
+  color: #5050c8;
+  background: #e4e4f0;
+  border-color: #c8c8dc;
+}
+html.light .jelly-detail-title  { color: #12121a; }
+html.light .jelly-detail-year-genre { color: #7878a0; }
+html.light .jelly-detail-rating { color: #5a5a7a; }
+html.light .jelly-detail-overview { color: #404058; }
+html.light .jelly-play-btn {
+  background: #5050c8;
+  color: #f8f8ff;
+}
+html.light .mk-detail-head { background: #f0f0f5; }
+html.light .mk-symbol { color: #12121a; }
+html.light .mk-name   { color: #7878a0; }
+html.light #mk-detail-price { color: #12121a; }
+
+/* Mk range buttons */
+html.light .mk-range-btn {
+  background: #e0e0ea;
+  border-color: #c4c4d4;
+  color: #50507a;
+}
+html.light .mk-range-btn.active {
+  background: #3030a0;
+  border-color: #5050c0;
+  color: #e8e8ff;
+}
+html.light .mk-chart {
+  background: #dcdce8;
+  border-color: #c4c4d4;
+}
+html.light .mk-info-item {
+  background: #e4e4ee;
+  border-color: #c8c8d8;
+}
+html.light .mk-info-label { color: #8080a0; }
+html.light .mk-info-value { color: #1a1a2a; }
+html.light .mk-fav-toggle {
+  background: #e0e0ea;
+  border-color: #c4c4d4;
+  color: #1a1a2a;
+}
+
+/* Light sheet */
+html.light #light-sheet-backdrop { background: rgba(220,220,230,0.7); }
+html.light #light-sheet {
+  background: #ededf5;
+  border-top-color: #d0d0de;
+}
+html.light .sheet-title  { color: #14141c; }
+html.light .sheet-close  { color: #7070908; }
+html.light .sheet-handle { background: #c0c0d0; }
+html.light .sheet-power-label { color: #5050688; }
+html.light .sheet-control-label { color: #50506a; }
+html.light .sheet-control-value { color: #14141c; }
+html.light .sheet-control { border-bottom-color: #d4d4e0; }
+html.light .sheet-colorwheel-header { color: #50506a; }
+
+/* Chartist overrides for light theme */
+html.light .ct-grid { stroke: rgba(0,0,0,0.08); }
+html.light .ct-label { fill: #7878a0 !important; color: #7878a0 !important; }
+html.light .weather-chart .ct-series-a .ct-line,
+html.light .weather-chart .ct-series-a .ct-point { stroke: #4040b0; }
+html.light .weather-chart .ct-series-b .ct-line,
+html.light .weather-chart .ct-series-b .ct-point { stroke: #8080b0; }
+
+/* Jelly grid cards */
+html.light .jelly-card {
+  background: #e4e4ec;
+  border-color: #c8c8d8;
+}
+html.light .jelly-card-title { color: #28283a; }
+html.light .jelly-card-year  { color: #9090a8; }
+html.light .jelly-card-poster-placeholder { background: #d8d8e8; color: #a0a0b8; }
+
+/* Jelly filters */
+html.light .jelly-header { background: #eaeaef; border-bottom-color: #d0d0da; }
+html.light .jf-select, html.light .jf-search-input {
+  background: #dcdce8;
+  border-color: #c0c0d0;
+  color: #1a1a28;
+}
+
+/* Pagination */
+html.light .jf-pag-btn {
+  background: #e0e0ea;
+  border-color: #c4c4d4;
+  color: #40407a;
+}
+html.light .jf-pag-info { color: #8080a0; }
+
+/* Confirm dialog */
+html.light .px-confirm-box {
+  background: #ededf5;
+  border-color: #d0d0de;
+}
+html.light .px-confirm-title { color: #14141c; }
+html.light .px-confirm-msg   { color: #40405a; }
+html.light .btn-primary.danger { background: #c02020; color: #ffe0e0; }
+
+/* Test results */
+html.light .test-result.ok  { background: rgba(40,160,80,0.08); border-color: #a0d0b0; color: #206840; }
+html.light .test-result.err { background: rgba(200,40,40,0.07); border-color: #d0a0a0; color: #802020; }
+
+/* Toggle visibility button */
+html.light .toggle-visibility { color: #8080a0; }
+
+/* Jelly pagination */
+html.light .jelly-pagination { border-top-color: #d0d0da; }
+

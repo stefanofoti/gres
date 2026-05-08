@@ -3,11 +3,68 @@
 var express = require('express');
 var router = express.Router();
 var fetch = require('node-fetch');
+var fs   = require('fs');
+var path = require('path');
+
+var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
+
+function readSettings() {
+  try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch(e) { return {}; }
+}
 
 function toNum(v) {
   var n = parseFloat(v);
   return isNaN(n) ? null : n;
 }
+
+/**
+ * GET /api/weather/home-summary
+ * Returns compact weather data for the default saved location.
+ * Used by the Home tab widget.
+ */
+router.get('/home-summary', function (req, res) {
+  var settings = readSettings();
+  var loc = settings.weather_default_location;
+  if (!loc || !loc.latitude || !loc.longitude) {
+    return res.status(404).json({ error: 'No default location set' });
+  }
+
+  var url = 'https://api.open-meteo.com/v1/forecast?' +
+    'latitude='  + encodeURIComponent(loc.latitude) +
+    '&longitude=' + encodeURIComponent(loc.longitude) +
+    '&timezone='  + encodeURIComponent(loc.timezone || 'auto') +
+    '&current=temperature_2m,weather_code,is_day' +
+    '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
+    '&forecast_days=1';
+
+  fetch(url, { timeout: 10000 })
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      var cur   = data.current || {};
+      var daily = data.daily   || {};
+      res.json({
+        location: { name: loc.name, country: loc.country || '' },
+        current: {
+          temp:        cur.temperature_2m  != null ? Math.round(cur.temperature_2m) : null,
+          weatherCode: cur.weather_code    != null ? cur.weather_code : null,
+          isDay:       cur.is_day          != null ? cur.is_day       : 1
+        },
+        today: {
+          tempMax:    daily.temperature_2m_max ? Math.round(daily.temperature_2m_max[0]) : null,
+          tempMin:    daily.temperature_2m_min ? Math.round(daily.temperature_2m_min[0]) : null,
+          precipProb: daily.precipitation_probability_max ? daily.precipitation_probability_max[0] : null,
+          weatherCode: daily.weather_code ? daily.weather_code[0] : null
+        }
+      });
+    })
+    .catch(function (e) {
+      req.log.warn({ err: e.message }, 'weather home-summary failed');
+      res.status(502).json({ error: e.message });
+    });
+});
 
 router.get('/search', function (req, res) {
   var q = (req.query.q || '').trim();

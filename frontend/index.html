@@ -25,17 +25,72 @@
 
     <!-- HOME -->
     <div id="page-home" class="page active">
-      <div class="page-header">
-        <div class="page-title">Home</div>
-        <div class="page-subtitle" id="home-greeting"></div>
-      </div>
-      <div class="page-content">
-        <div class="empty-state" id="home-empty">
-          <div class="empty-icon">⬡</div>
-          <div class="empty-title">No widgets</div>
-          <div class="empty-desc">Add widgets from other sections to display them here</div>
+      <div class="home-header">
+        <div class="home-header-top">
+          <div class="home-greeting-block">
+            <div class="home-greeting" id="home-greeting">Good morning</div>
+            <div class="home-date" id="home-date"></div>
+          </div>
+          <div class="home-status-dot-wrap">
+            <span id="home-ha-dot" class="home-ha-dot home-ha-dot--unknown"></span>
+          </div>
         </div>
-        <div id="home-widgets" class="widget-grid"></div>
+      </div>
+
+      <div class="home-content">
+
+        <!-- Quick glance row: Weather + Jellyfin side by side -->
+        <div class="home-glance-row" id="home-widgets">
+          <!-- populated by JS -->
+        </div>
+
+        <!-- Empty state (shown when no widgets) -->
+        <div class="home-empty" id="home-empty">
+          <div class="home-empty-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="8" height="8" rx="2" stroke="#3a3a5a" stroke-width="1.4"/>
+              <rect x="13" y="3" width="8" height="8" rx="2" stroke="#3a3a5a" stroke-width="1.4"/>
+              <rect x="3" y="13" width="8" height="8" rx="2" stroke="#3a3a5a" stroke-width="1.4"/>
+              <rect x="13" y="13" width="8" height="8" rx="2" stroke="#3a3a5a" stroke-width="1.4"/>
+            </svg>
+          </div>
+          <div class="home-empty-title">No widgets yet</div>
+          <div class="home-empty-desc">Enable features and add widgets from Settings</div>
+        </div>
+
+        <!-- Placeholder widgets for upcoming Proxmox + Markets -->
+        <div class="home-placeholder-row" id="home-placeholder-row">
+          <div class="home-placeholder-card">
+            <div class="home-placeholder-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="3" width="20" height="6" rx="2" stroke="#3a3a5a" stroke-width="1.5"/>
+                <rect x="2" y="13" width="20" height="6" rx="2" stroke="#3a3a5a" stroke-width="1.5"/>
+                <circle cx="18" cy="6" r="1" fill="#3a3a5a"/>
+                <circle cx="18" cy="16" r="1" fill="#3a3a5a"/>
+              </svg>
+            </div>
+            <div class="home-placeholder-card-label">VM Monitor</div>
+            <div class="home-placeholder-card-sub">Coming soon</div>
+          </div>
+          <div class="home-placeholder-card">
+            <div class="home-placeholder-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <polyline points="3,17 8,11 13,14 21,6" stroke="#3a3a5a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M17 6h4v4" stroke="#3a3a5a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="3" y1="21" x2="21" y2="21" stroke="#3a3a5a" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="home-placeholder-card-label">Markets</div>
+            <div class="home-placeholder-card-sub">Coming soon</div>
+          </div>
+        </div>
+
+        <!-- Smart Home quick tiles -->
+        <div id="home-smarthome-section" class="home-section hidden">
+          <div class="home-section-label">Smart Home</div>
+          <div id="home-smarthome-grid" class="devices-grid"></div>
+        </div>
+
       </div>
     </div>
 
@@ -94,6 +149,7 @@
               <div class="weather-now-desc" id="weather-current-desc">—</div>
             </div>
             <div class="weather-now-side">
+              <div id="weather-current-icon" style="text-align:right;margin-bottom:6px;"></div>
               <div class="weather-now-line"><span>Humidity</span><strong id="weather-current-humidity">—</strong></div>
               <div class="weather-now-line"><span>Wind</span><strong id="weather-current-wind">—</strong></div>
             </div>
@@ -101,14 +157,18 @@
 
           <div class="weather-highlight-grid">
             <div class="weather-day-card">
+              <div class="weather-day-card-icon" id="weather-today-icon"></div>
               <div class="weather-day-label">Today</div>
               <div class="weather-day-temp"><span id="weather-today-max">--°</span><small id="weather-today-min">--°</small></div>
               <div class="weather-day-desc" id="weather-today-desc">—</div>
+              <div class="weather-day-precip" id="weather-today-precip" style="display:none;margin-top:5px;font-size:10px;color:#7a7aaa;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;gap:3px;"></div>
             </div>
             <div class="weather-day-card">
+              <div class="weather-day-card-icon" id="weather-tomorrow-icon"></div>
               <div class="weather-day-label">Tomorrow</div>
               <div class="weather-day-temp"><span id="weather-tomorrow-max">--°</span><small id="weather-tomorrow-min">--°</small></div>
               <div class="weather-day-desc" id="weather-tomorrow-desc">—</div>
+              <div class="weather-day-precip" id="weather-tomorrow-precip" style="display:none;margin-top:5px;font-size:10px;color:#7a7aaa;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;gap:3px;"></div>
             </div>
           </div>
 
@@ -149,7 +209,14 @@
         <!-- RIGHT: detail panel -->
         <div class="px-detail" id="px-detail">
           <div class="px-detail-empty" id="px-detail-empty">
-            <div class="px-detail-empty-icon">◈</div>
+            <div class="px-detail-empty-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="20" height="6" rx="2" stroke="#3a3a5a" stroke-width="1.4"/>
+              <rect x="2" y="13" width="20" height="6" rx="2" stroke="#3a3a5a" stroke-width="1.4"/>
+              <circle cx="18" cy="6" r="1" fill="#3a3a5a"/>
+              <circle cx="18" cy="16" r="1" fill="#3a3a5a"/>
+            </svg>
+          </div>
             <div class="px-detail-empty-text">Select an item</div>
           </div>
           <div id="px-detail-content" class="hidden"></div>
@@ -295,6 +362,154 @@
           <div id="px-test-result" class="test-result hidden"></div>
         </div>
 
+        <!-- ── Appearance ───────────────────────────────── -->
+        <div class="settings-block" id="appearance-block">
+          <div class="settings-block-title">Appearance</div>
+          <div class="settings-block-desc">Customize the visual style of the dashboard.</div>
+
+          <!-- Theme toggle -->
+          <div class="appearance-row">
+            <div class="appearance-row-left">
+              <div class="appearance-row-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.7"/>
+                  <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="appearance-row-label">Light theme</div>
+            </div>
+            <div class="power-toggle" id="toggle-light-theme">
+              <div class="power-knob"></div>
+            </div>
+          </div>
+
+          <!-- Status bar toggle -->
+          <div class="appearance-row">
+            <div class="appearance-row-left">
+              <div class="appearance-row-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/>
+                  <line x1="2" y1="9" x2="22" y2="9" stroke="currentColor" stroke-width="1.4"/>
+                  <circle cx="5.5" cy="7" r="1" fill="currentColor"/>
+                  <circle cx="18.5" cy="7" r="1" fill="currentColor"/>
+                </svg>
+              </div>
+              <div class="appearance-row-label">Status bar</div>
+            </div>
+            <div class="power-toggle" id="toggle-status-bar">
+              <div class="power-knob"></div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="settings-block" id="features-block">
+          <div class="settings-block-title">Features</div>
+          <div class="settings-block-desc">Enable or disable tabs. Tap a row to configure home widgets.</div>
+
+          <!-- Smart Home -->
+          <div class="feat-accordion" id="feat-acc-smarthome">
+            <div class="feat-acc-header" id="feat-hdr-smarthome">
+              <div class="feat-acc-left">
+                <span class="feat-acc-chevron" id="feat-chv-smarthome">›</span>
+                <span class="feature-row-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41 1.41" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </span>
+                <span class="feat-acc-label">Smart Home</span>
+              </div>
+              <div class="power-toggle" id="feat-toggle-smarthome">
+                <div class="power-knob"></div>
+              </div>
+            </div>
+            <div class="feat-acc-body hidden" id="feat-body-smarthome">
+              <div class="feat-acc-loading" id="feat-load-smarthome">
+                <div class="spinner-sm"></div>
+              </div>
+              <div class="feat-acc-list" id="feat-list-smarthome"></div>
+            </div>
+          </div>
+
+          <!-- Weather -->
+          <div class="feat-accordion" id="feat-acc-meteo">
+            <div class="feat-acc-header" id="feat-hdr-meteo">
+              <div class="feat-acc-left">
+                <span class="feat-acc-chevron" id="feat-chv-meteo">›</span>
+                <span class="feature-row-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M5 19a4 4 0 0 1 4-4h6a3 3 0 0 1 0 6H9a4 4 0 0 1-4-4z" stroke="currentColor" stroke-width="1.6"/></svg>
+                </span>
+                <span class="feat-acc-label">Weather</span>
+              </div>
+              <div class="power-toggle" id="feat-toggle-meteo">
+                <div class="power-knob"></div>
+              </div>
+            </div>
+            <div class="feat-acc-body hidden" id="feat-body-meteo">
+              <div class="feat-acc-list" id="feat-list-meteo"></div>
+            </div>
+          </div>
+
+          <!-- Jellyfin -->
+          <div class="feat-accordion" id="feat-acc-jelly">
+            <div class="feat-acc-header" id="feat-hdr-jelly">
+              <div class="feat-acc-left">
+                <span class="feat-acc-chevron" id="feat-chv-jelly">›</span>
+                <span class="feature-row-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="currentColor"/></svg>
+                </span>
+                <span class="feat-acc-label">Jellyfin</span>
+              </div>
+              <div class="power-toggle" id="feat-toggle-jelly">
+                <div class="power-knob"></div>
+              </div>
+            </div>
+            <div class="feat-acc-body hidden" id="feat-body-jelly">
+              <div class="feat-acc-list" id="feat-list-jelly"></div>
+            </div>
+          </div>
+
+          <!-- Markets -->
+          <div class="feat-accordion" id="feat-acc-markets">
+            <div class="feat-acc-header" id="feat-hdr-markets">
+              <div class="feat-acc-left">
+                <span class="feat-acc-chevron" id="feat-chv-markets">›</span>
+                <span class="feature-row-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polyline points="3,17 8,11 13,14 21,6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 6h4v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </span>
+                <span class="feat-acc-label">Markets</span>
+              </div>
+              <div class="power-toggle" id="feat-toggle-markets">
+                <div class="power-knob"></div>
+              </div>
+            </div>
+            <div class="feat-acc-body hidden" id="feat-body-markets">
+              <div class="feat-acc-loading hidden" id="feat-load-markets">
+                <div class="spinner-sm"></div>
+              </div>
+              <div class="feat-acc-list" id="feat-list-markets"></div>
+            </div>
+          </div>
+
+          <!-- Server -->
+          <div class="feat-accordion" id="feat-acc-server">
+            <div class="feat-acc-header" id="feat-hdr-server">
+              <div class="feat-acc-left">
+                <span class="feat-acc-chevron" id="feat-chv-server">›</span>
+                <span class="feature-row-icon">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="6" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="2" y="13" width="20" height="6" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="6" r="1" fill="currentColor"/><circle cx="18" cy="16" r="1" fill="currentColor"/></svg>
+                </span>
+                <span class="feat-acc-label">Server</span>
+              </div>
+              <div class="power-toggle" id="feat-toggle-server">
+                <div class="power-knob"></div>
+              </div>
+            </div>
+            <div class="feat-acc-body hidden" id="feat-body-server">
+              <div class="feat-acc-list" id="feat-list-server"></div>
+            </div>
+          </div>
+
+        </div>
+
         <div class="settings-block settings-block-placeholder">
           <div class="settings-block-title">Notifications</div>
           <div class="settings-block-desc settings-placeholder-text">Coming soon</div>
@@ -370,7 +585,7 @@
         <div class="jelly-detail-year-genre" id="jelly-detail-meta"></div>
         <div class="jelly-detail-title" id="jelly-detail-title"></div>
         <div class="jelly-detail-rating" id="jelly-detail-rating"></div>
-        <button id="jelly-play-btn" class="jelly-play-btn hidden" type="button">▶ Play</button>
+        <button id="jelly-play-btn" class="jelly-play-btn hidden" type="button"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="display:inline-block;vertical-align:middle;margin-right:5px"><path d="M8 5l11 7-11 7V5z" fill="currentColor"/></svg>Play</button>
         <div class="jelly-detail-overview" id="jelly-detail-overview"></div>
       </div>
     </div>
@@ -494,31 +709,71 @@
   <!-- Tab Bar -->
   <nav id="tab-bar">
     <button class="tab active" data-page="home">
-      <span class="tab-icon">⌂</span>
+      <span class="tab-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M9 21V12h6v9" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+      </span>
       <span class="tab-label">Home</span>
     </button>
     <button class="tab" data-page="smarthome">
-      <span class="tab-icon">◈</span>
+      <span class="tab-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </span>
       <span class="tab-label">Smart</span>
     </button>
     <button class="tab" data-page="jelly">
-      <span class="tab-icon">▶</span>
+      <span class="tab-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="currentColor"/>
+        </svg>
+      </span>
       <span class="tab-label">Jelly</span>
     </button>
     <button class="tab" data-page="meteo">
-      <span class="tab-icon">◎</span>
+      <span class="tab-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 2v2M12 16v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 10h2M20 10h2M4.93 15.07l1.41-1.41M17.66 4.34l1.41 1.41" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M5 19a4 4 0 0 1 4-4h6a3 3 0 0 1 0 6H9a4 4 0 0 1-4-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+      </span>
       <span class="tab-label">Weather</span>
     </button>
     <button class="tab" data-page="markets">
-      <span class="tab-icon">◬</span>
+      <span class="tab-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polyline points="3,17 8,11 13,14 21,6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M17 6h4v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="3" y1="21" x2="21" y2="21" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </span>
       <span class="tab-label">Markets</span>
     </button>
     <button class="tab" data-page="server">
-      <span class="tab-icon">⬡</span>
+      <span class="tab-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="3" width="20" height="6" rx="2" stroke="currentColor" stroke-width="1.6"/>
+          <rect x="2" y="13" width="20" height="6" rx="2" stroke="currentColor" stroke-width="1.6"/>
+          <circle cx="18" cy="6" r="1" fill="currentColor"/>
+          <circle cx="18" cy="16" r="1" fill="currentColor"/>
+        </svg>
+      </span>
       <span class="tab-label">Server</span>
     </button>
     <button class="tab" data-page="settings">
-      <span class="tab-icon">⚙</span>
+      <span class="tab-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M12 2a1 1 0 0 1 1 1v1.07A7 7 0 0 1 17.66 6.5l.76-.76a1 1 0 0 1 1.41 1.41l-.76.76A7 7 0 0 1 21 12h1a1 1 0 0 1 0 2h-1a7 7 0 0 1-1.93 3.93l.76.76a1 1 0 0 1-1.41 1.41l-.76-.76A7 7 0 0 1 13 20.93V22a1 1 0 0 1-2 0v-1.07A7 7 0 0 1 6.34 18.5l-.76.76a1 1 0 0 1-1.41-1.41l.76-.76A7 7 0 0 1 3 14H2a1 1 0 0 1 0-2h1a7 7 0 0 1 1.93-3.93l-.76-.76a1 1 0 0 1 1.41-1.41l.76.76A7 7 0 0 1 11 3.07V2a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+      </span>
       <span class="tab-label">Settings</span>
     </button>
   </nav>

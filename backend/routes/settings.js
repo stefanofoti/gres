@@ -51,13 +51,17 @@ function readSettings() {
 }
 
 /**
- * Serialise and write a settings map to disk.
+ * Serialise and write a settings map to disk atomically.
+ * Writes to a temp file first, then renames to avoid corruption
+ * if two requests arrive concurrently or the process is killed mid-write.
  *
  * @param {Object} data — settings to persist.
  */
 function writeSettings(data) {
   ensureDataDir();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  var tmp = DATA_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, DATA_FILE);
 }
 
 /* ── Routes ─────────────────────────────────────────────── */

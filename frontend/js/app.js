@@ -41,6 +41,111 @@
     req.onerror = function () { cb('Network error', null); };
     req.send(body ? JSON.stringify(body) : null);
   }
+  /* Esposto globalmente per il riuso tra moduli */
+  window._xhr = xhr;
+  /* openLightSheet exposed after function is defined below */
+
+  /* ── shared weather icon function ───────────────────
+     Returns an SVG string for a given WMO weather code.
+     isDay: 1 = day, 0 = night.
+     size: pixel size for width/height attribute.           */
+  window._wxIcon = function (code, isDay, size) {
+    var s = size || 24;
+    var c = code || 0;
+    var d = (isDay !== 0);
+
+    /* colour palette */
+    var SUN   = '#f5d84e';
+    var MOON  = '#c8d4f0';
+    var CLOUD = '#9090b0';
+    var LCLOUD= '#b8b8d0';
+    var RAIN  = '#70a0e0';
+    var SNOW  = '#c8d8f8';
+    var BOLT  = '#f0d060';
+    var FOG   = '#808098';
+
+    function svg(content) {
+      return '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + '" height="' + s +
+        '" viewBox="0 0 24 24" fill="none">' + content + '</svg>';
+    }
+    function sun() {
+      return '<circle cx="12" cy="12" r="4.5" fill="' + SUN + '"/>' +
+        '<g stroke="' + SUN + '" stroke-width="1.5" stroke-linecap="round">' +
+        '<line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/>' +
+        '<line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/>' +
+        '<line x1="4.9" y1="4.9" x2="7.1" y2="7.1"/><line x1="16.9" y1="16.9" x2="19.1" y2="19.1"/>' +
+        '<line x1="19.1" y1="4.9" x2="16.9" y2="7.1"/><line x1="7.1" y1="16.9" x2="4.9" y2="19.1"/>' +
+        '</g>';
+    }
+    function moon() {
+      return '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="' + MOON + '"/>';
+    }
+    function cloud(x, y, col) {
+      x = x || 0; y = y || 0; col = col || CLOUD;
+      return '<path d="M' + (5+x) + ' ' + (17+y) + 'a4 4 0 0 1 0-8 5 5 0 0 1 9.9-1A3.5 3.5 0 1 1 ' + (18.5+x) + ' ' + (17+y) + 'z" fill="' + col + '"/>';
+    }
+    function rainDrops(n, col) {
+      var out = ''; col = col || RAIN; n = n || 2;
+      var xs = [9, 13, 11, 15];
+      for (var i = 0; i < n && i < 4; i++) {
+        out += '<line x1="' + xs[i] + '" y1="19" x2="' + (xs[i]-1) + '" y2="22" stroke="' + col + '" stroke-width="1.5" stroke-linecap="round"/>';
+      }
+      return out;
+    }
+    function snowFlakes(n) {
+      var out = ''; n = n || 2;
+      var xs = [9, 13, 11, 15];
+      for (var i = 0; i < n && i < 4; i++) {
+        out += '<circle cx="' + xs[i] + '" cy="21" r="1" fill="' + SNOW + '"/>';
+      }
+      return out;
+    }
+
+    /* code → icon */
+    if (c === 0) { /* clear */
+      return svg(d ? sun() : moon());
+    }
+    if (c <= 2) { /* mainly clear / partly cloudy */
+      return svg((d ? sun() : moon()) + cloud(2, 0, LCLOUD));
+    }
+    if (c === 3) { /* overcast */
+      return svg(cloud(0, -2, LCLOUD) + cloud(2, 2, CLOUD));
+    }
+    if (c === 45 || c === 48) { /* fog */
+      return svg('<rect x="3" y="9" width="18" height="1.5" rx="1" fill="' + FOG + '"/>' +
+        '<rect x="5" y="12" width="14" height="1.5" rx="1" fill="' + FOG + '"/>' +
+        '<rect x="3" y="15" width="18" height="1.5" rx="1" fill="' + FOG + '"/>');
+    }
+    if (c >= 51 && c <= 57) { /* drizzle */
+      return svg(cloud() + rainDrops(2));
+    }
+    if (c >= 61 && c <= 67) { /* rain */
+      return svg(cloud() + rainDrops(4));
+    }
+    if (c >= 71 && c <= 77) { /* snow */
+      return svg(cloud() + snowFlakes(3));
+    }
+    if (c >= 80 && c <= 82) { /* showers */
+      return svg((d ? sun() : moon()) + cloud(2, 0, LCLOUD) + rainDrops(3));
+    }
+    if (c === 85 || c === 86) { /* snow showers */
+      return svg(cloud() + snowFlakes(2));
+    }
+    if (c >= 95) { /* thunderstorm */
+      return svg(cloud() + '<path d="M13 14l-2 4h3l-2 4" stroke="' + BOLT + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>');
+    }
+    /* fallback */
+    return svg(cloud());
+  };
+
+  /* rain-drop icon for precip probability */
+  window._wxRainIcon = function (size) {
+    var s = size || 11;
+    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + '" height="' + s +
+      '" viewBox="0 0 24 24" fill="none">' +
+      '<path d="M12 3 C12 3 5 12 5 16 a7 7 0 0 0 14 0 C19 12 12 3 12 3z" fill="#70a0e0"/>' +
+      '</svg>';
+  };
 
   /* ── toast ──────────────────────────────────────────── */
   var _toastTimer;
@@ -56,6 +161,8 @@
       setTimeout(function () { t.classList.add('hidden'); }, 260);
     }, dur || 2200);
   }
+  /* Esposto globalmente per il riuso tra moduli */
+  window._toast = toast;
 
   /* ── clock ──────────────────────────────────────────── */
   function tick() {
@@ -75,7 +182,6 @@
       h < 21 ? 'Good evening'   : 'Good night';
   })();
 
-  /* ── navigation ─────────────────────────────────────── */
   /* ── Page navigation ────────────────────────────────── */
   function showPage(id) {
     // Hide all pages and deactivate all tabs
@@ -88,6 +194,7 @@
     if (p) p.classList.add('active');
     if (t) t.classList.add('active');
     state.page = id;
+    window._currentPage = id;
     // Load page-specific data if needed
     if (id === 'smarthome') loadSmartHome(false);
     if (id === 'settings')  loadSettings();
@@ -96,9 +203,16 @@
   var tabEls = document.querySelectorAll('.tab');
   for (var _ti = 0; _ti < tabEls.length; _ti++) {
     (function (tab) {
-      tab.addEventListener('click', function () { showPage(tab.getAttribute('data-page')); });
+      tab.addEventListener('click', function () {
+        var id = tab.getAttribute('data-page');
+        showPage(id);
+        if (id === 'home' && window._homeRefresh) window._homeRefresh();
+      });
     })(tabEls[_ti]);
   }
+
+  /* expose showPage for other modules that need programmatic navigation */
+  window._showPage = showPage;
 
   /* ── HA status ──────────────────────────────────────── */
   function checkHA() {
@@ -111,6 +225,11 @@
   }
   checkHA();
   setInterval(checkHA, 30000);
+
+  /* ── startup: load settings immediately ─────────────── */
+  /* This ensures features_disabled (and other settings) are applied
+     on first paint, without requiring the user to open the Settings tab. */
+  loadSettings();
 
   /* ── domain groups ──────────────────────────────────── */
   var GROUPS = [
@@ -208,15 +327,7 @@
     var ctx = canvas.getContext('2d');
     var W = canvas.width, cx = W/2, cy = W/2, r = W/2 - 2;
     ctx.clearRect(0, 0, W, W);
-    // draw hue/saturation wheel
-    for (var angle = 0; angle < 360; angle++) {
-      var startAngle = (angle - 1) * Math.PI / 180;
-      var endAngle   = (angle + 1) * Math.PI / 180;
-      for (var sat = 0; sat <= 100; sat += 2) {
-        // draw small arc segments per saturation
-      }
-    }
-    // Use imageData for performance
+    // Render wheel pixel-by-pixel via imageData
     var imageData = ctx.createImageData(W, W);
     var data = imageData.data;
     for (var y = 0; y < W; y++) {
@@ -490,9 +601,11 @@
   var _wheelDragging = false;
   canvas.addEventListener('mousedown',  function(e){ _wheelDragging = true; handleWheelEvent(e); });
   canvas.addEventListener('mousemove',  function(e){ if(_wheelDragging) handleWheelEvent(e); });
-  canvas.addEventListener('mouseup',    function(){ _wheelDragging = false; });
+  document.addEventListener('mouseup',  function(){ _wheelDragging = false; });
   canvas.addEventListener('touchstart', function(e){ handleWheelEvent(e); }, false);
   canvas.addEventListener('touchmove',  function(e){ handleWheelEvent(e); }, false);
+  canvas.addEventListener('touchend',   function(){ /* chiude il gesto */ }, false);
+  canvas.addEventListener('touchcancel', function(){ clearTimeout(_colorSendTimer); }, false);
 
   /* ── HA service call ────────────────────────────────── */
   function callService(domain, service, serviceData, cb) {
@@ -775,6 +888,352 @@
     }
   }, 20000);
 
+  /* expose openLightSheet for Home module device cards */
+  window._openLightSheet = openLightSheet;
+
+})();
+
+/* ════════════════════════════════════════════════════════
+   HOME MODULE
+   Renders home_widgets on the home tab.
+   Widget types: smarthome, jelly, meteo.
+   Jellyfin + Weather are rendered side-by-side in glance row.
+   ════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var _glanceRow  = null;
+  var _emptyEl    = null;
+  var _haSection  = null;
+  var _haGrid     = null;
+  var _placeholderRow = null;
+  var _widgets    = [];
+  var _haEntities = null;
+
+  function $(id) { return document.getElementById(id); }
+
+  /* populate home-date */
+  (function () {
+    var d = new Date();
+    var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var el = $('home-date');
+    if (el) el.textContent = days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate();
+  })();
+
+  /* mirror HA status dot on home screen */
+  (function () {
+    var origCheckHA = window._checkHA;
+    /* poll every 30s already running in core; just mirror the status-dot class */
+    function syncDot() {
+      var src = $('status-dot');
+      var dst = $('home-ha-dot');
+      if (!src || !dst) return;
+      dst.className = 'home-ha-dot ' + (
+        src.classList.contains('dot-ok')  ? 'home-ha-dot--ok' :
+        src.classList.contains('dot-err') ? 'home-ha-dot--err' : 'home-ha-dot--unknown'
+      );
+    }
+    setInterval(syncDot, 3000);
+    syncDot();
+  })();
+
+  window._homeSetWidgets = function (widgets) {
+    _widgets = Array.isArray(widgets) ? widgets : [];
+    _haEntities = null;
+    if (window._currentPage === 'home' || !window._currentPage) renderHome();
+  };
+
+  window._homeRefresh = function () { renderHome(); };
+
+  /* ── main render ──────────────────────────────────── */
+  function renderHome() {
+    _glanceRow      = $('home-widgets');
+    _emptyEl        = $('home-empty');
+    _haSection      = $('home-smarthome-section');
+    _haGrid         = $('home-smarthome-grid');
+    _placeholderRow = $('home-placeholder-row');
+    if (!_glanceRow) return;
+
+    _glanceRow.innerHTML = '';
+
+    var haWidgets = [];
+    var hasJelly  = false;
+    var hasMeteo  = false;
+
+    for (var i = 0; i < _widgets.length; i++) {
+      var w = _widgets[i];
+      if (w.type === 'smarthome') haWidgets.push(w);
+      else if (w.type === 'jelly') hasJelly = true;
+      else if (w.type === 'meteo') hasMeteo = true;
+    }
+
+    var hasAny = haWidgets.length || hasJelly || hasMeteo;
+
+    /* empty state */
+    if (_emptyEl) {
+      if (hasAny) _emptyEl.classList.remove('visible');
+      else _emptyEl.classList.add('visible');
+    }
+
+    /* placeholder row: hide if we have Jelly or Meteo */
+    if (_placeholderRow) {
+      _placeholderRow.style.display = (hasJelly || hasMeteo) ? 'none' : '';
+    }
+
+    /* Jelly + Weather side by side in glance row */
+    if (hasJelly || hasMeteo) {
+      _glanceRow.style.display = '';
+      if (hasJelly) {
+        var jCol = document.createElement('div');
+        jCol.className = 'home-glance-col';
+        _glanceRow.appendChild(jCol);
+        renderJellyCard(jCol);
+      }
+      if (hasMeteo) {
+        var wCol = document.createElement('div');
+        wCol.className = 'home-glance-col';
+        _glanceRow.appendChild(wCol);
+        renderWeatherCard(wCol);
+      }
+      /* solo: add class so it stretches full width */
+      if ((hasJelly ? 1 : 0) + (hasMeteo ? 1 : 0) === 1) {
+        _glanceRow.className = 'home-glance-row solo';
+      } else {
+        _glanceRow.className = 'home-glance-row';
+      }
+    } else {
+      _glanceRow.style.display = 'none';
+    }
+
+    /* HA tiles */
+    if (_haSection && _haGrid) {
+      if (haWidgets.length) {
+        _haSection.classList.remove('hidden');
+        _haGrid.innerHTML = '';
+        buildHACards(_haGrid, haWidgets, _haEntities || []);
+        if (!_haEntities) {
+          window._xhr('GET', '/api/ha/entities', null, function (err, entities) {
+            if (!err && Array.isArray(entities)) _haEntities = entities;
+            buildHACards(_haGrid, haWidgets, _haEntities || []);
+          });
+        }
+      } else {
+        _haSection.classList.add('hidden');
+      }
+    }
+  }
+
+  /* ── HA devices ────────────────────────────────────── */
+  function buildHACards(grid, haWidgets, entities) {
+    grid.innerHTML = '';
+    var entityMap = {};
+    for (var i = 0; i < entities.length; i++) entityMap[entities[i].entity_id] = entities[i];
+
+    var ICONS = { light:'○', switch:'⌁', input_boolean:'⌁', media_player:'▷', climate:'◇', fan:'◎', cover:'▭' };
+    function domainOf(eid)   { return eid.split('.')[0]; }
+    function isOn(e)         { var s=e.state; return s==='on'||s==='open'||s==='playing'||s==='paused'||s==='idle'; }
+    function stateLabel(s)   { var m={on:'On',off:'Off',open:'Open',closed:'Closed',playing:'Playing',paused:'Paused',idle:'Idle',unavailable:'N/A',unknown:'?'}; return m[s]||s; }
+    function friendlyName(e) { return (e.attributes&&e.attributes.friendly_name)?e.attributes.friendly_name:e.entity_id.split('.')[1].replace(/_/g,' '); }
+    function make(tag,cls,txt){ var el=document.createElement(tag); if(cls)el.className=cls; if(txt!=null)el.textContent=txt; return el; }
+
+    for (var k = 0; k < haWidgets.length; k++) {
+      (function (w) {
+        var entity = entityMap[w.id];
+        if (!entity) {
+          var ghost = make('div','device-card unavail');
+          ghost.appendChild(make('div','card-icon','◈'));
+          var gi=make('div','card-info'); gi.appendChild(make('div','card-name',w.label||w.id)); gi.appendChild(make('div','card-state','N/A'));
+          ghost.appendChild(gi); grid.appendChild(ghost); return;
+        }
+        var on = isOn(entity), unavail = entity.state==='unavailable', domain = domainOf(entity.entity_id);
+        var card = make('div','device-card'+(on?' on':'')+(unavail?' unavail':''));
+        card.setAttribute('data-eid', entity.entity_id);
+        var ico=make('div','card-icon',ICONS[domain]||'◈');
+        var info=make('div','card-info');
+        info.appendChild(make('div','card-name',friendlyName(entity)));
+        var stateEl=make('div','card-state',stateLabel(entity.state));
+        info.appendChild(stateEl);
+
+        if (domain==='light' && !unavail) {
+          var split=make('div','light-card-split');
+          var lb=make('button','light-main-toggle'); lb.type='button';
+          var iw=make('div','light-main-icon-wrap'); iw.appendChild(ico); lb.appendChild(iw); lb.appendChild(info);
+          var rb=make('button','light-detail-open','›'); rb.type='button';
+          lb.addEventListener('click', function(ev){ ev.stopPropagation();
+            window._xhr('POST','/api/ha/service',{domain:'light',service:on?'turn_off':'turn_on',service_data:{entity_id:entity.entity_id}},function(err){
+              if(!err){on=!on;entity.state=on?'on':'off';_haEntities=null;card.className='device-card'+(on?' on':'');stateEl.textContent=stateLabel(entity.state);}
+            });
+          });
+          rb.addEventListener('click',function(ev){ ev.stopPropagation(); if(window._openLightSheet)window._openLightSheet(entity); });
+          split.appendChild(lb); split.appendChild(rb); card.appendChild(split);
+        } else {
+          card.appendChild(ico); card.appendChild(info);
+          if (!unavail) {
+            card.addEventListener('click', function(){
+              var svc=on?(domain==='cover'?'close_cover':'turn_off'):(domain==='cover'?'open_cover':'turn_on');
+              var sd=domain==='cover'?'cover':(domain==='media_player'?'media_player':domain);
+              window._xhr('POST','/api/ha/service',{domain:sd,service:svc,service_data:{entity_id:entity.entity_id}},function(err){
+                if(!err){on=!on;entity.state=on?'on':'off';_haEntities=null;card.className='device-card'+(on?' on':'');stateEl.textContent=stateLabel(entity.state);}
+              });
+            });
+          }
+        }
+        grid.appendChild(card);
+      })(haWidgets[k]);
+    }
+  }
+
+  /* ── Jellyfin card ─────────────────────────────────── */
+  function renderJellyCard(col) {
+    var card = document.createElement('div');
+    card.className = 'hw-jelly-card';
+    col.appendChild(card);
+
+    /* skeleton */
+    card.innerHTML =
+      '<div class="hw-jelly-posters">' +
+        '<div class="hw-jelly-poster"><div class="hw-jelly-poster-fallback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="#3a3a5a" stroke-width="1.6"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="#3a3a5a"/></svg></div></div>' +
+        '<div class="hw-jelly-poster"><div class="hw-jelly-poster-fallback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="#3a3a5a" stroke-width="1.6"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="#3a3a5a"/></svg></div></div>' +
+        '<div class="hw-jelly-poster"><div class="hw-jelly-poster-fallback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="#3a3a5a" stroke-width="1.6"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="#3a3a5a"/></svg></div></div>' +
+      '</div>' +
+      '<div class="hw-jelly-meta">' +
+        '<div class="hw-jelly-meta-left"><span class="hw-jelly-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="currentColor"/></svg></span><span class="hw-jelly-title">Jellyfin</span></div>' +
+        '<span class="hw-jelly-counts">…</span>' +
+        '<span class="hw-jelly-arrow">›</span>' +
+      '</div>';
+
+    window._xhr('GET', '/api/jf/home-summary', null, function (err, data) {
+      if (err || !data) {
+        card.querySelector('.hw-jelly-counts').textContent = 'N/A';
+        return;
+      }
+      var postersEl = card.querySelector('.hw-jelly-posters');
+      postersEl.innerHTML = '';
+      var recent = Array.isArray(data.recentMovies) ? data.recentMovies : [];
+      while (recent.length < 3) recent.push(null);
+      recent = recent.slice(0, 3);
+      for (var i = 0; i < 3; i++) {
+        (function (item) {
+          var div = document.createElement('div');
+          div.className = 'hw-jelly-poster';
+          var fb = document.createElement('div');
+          fb.className = 'hw-jelly-poster-fallback';
+          fb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="#3a3a5a" stroke-width="1.6"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="#3a3a5a"/></svg>';
+          div.appendChild(fb);
+          if (item && item.id) {
+            var img = new Image();
+            img.onload = function () { div.style.backgroundImage = 'url(' + img.src + ')'; };
+            img.src = '/api/jf/image/' + item.id + '?type=Primary&maxH=220';
+          }
+          if (item) {
+            var ttl = document.createElement('div');
+            ttl.className = 'hw-jelly-poster-title';
+            ttl.textContent = item.name + (item.year ? ' ' + item.year : '');
+            div.appendChild(ttl);
+          }
+          postersEl.appendChild(div);
+        })(recent[i]);
+      }
+      var counts = (data.totalMovies || 0) + ' films · ' + (data.totalSeries || 0) + ' series';
+      card.querySelector('.hw-jelly-counts').textContent = counts;
+    });
+
+    card.addEventListener('click', function () {
+      var t = document.querySelector('[data-page="jelly"]');
+      if (t) t.click();
+    });
+  }
+
+  /* ── Weather card ──────────────────────────────────── */
+  function renderWeatherCard(col) {
+    var card = document.createElement('div');
+    card.className = 'hw-wx-card';
+    col.appendChild(card);
+
+    card.innerHTML = '<div class="hw-wx-na">Loading…</div>';
+
+    window._xhr('GET', '/api/weather/home-summary', null, function (err, data) {
+      card.innerHTML = '';
+
+      if (err || !data || !data.current) {
+        card.innerHTML = '<div class="hw-wx-na">N/A</div>';
+        return;
+      }
+
+      var cur   = data.current;
+      var today = data.today    || {};
+      var loc   = data.location || {};
+      var code  = cur.weatherCode != null ? cur.weatherCode : 0;
+      var isDay = cur.isDay      != null ? cur.isDay        : 1;
+
+      /* ── top bar: pin + location ── */
+      var topbar = document.createElement('div');
+      topbar.className = 'hw-wx-topbar';
+      var pin = document.createElement('span');
+      pin.className = 'hw-wx-pin';
+      pin.textContent = '⌖';          /* pin-point glyph */
+      var locEl = document.createElement('span');
+      locEl.className = 'hw-wx-loc';
+      locEl.textContent = loc.name || '';
+      topbar.appendChild(pin);
+      topbar.appendChild(locEl);
+      card.appendChild(topbar);
+
+      /* ── main row ── */
+      var main = document.createElement('div');
+      main.className = 'hw-wx-main';
+
+      /* icon — large */
+      var iconEl = document.createElement('div');
+      iconEl.className = 'hw-wx-icon';
+      if (window._wxIcon) iconEl.innerHTML = window._wxIcon(code, isDay, 42);
+      main.appendChild(iconEl);
+
+      /* current temp */
+      var tempEl = document.createElement('div');
+      tempEl.className = 'hw-wx-temp';
+      tempEl.textContent = cur.temp != null ? cur.temp + '°' : '--°';
+      main.appendChild(tempEl);
+
+      /* max / min stacked */
+      var rangeCol = document.createElement('div');
+      rangeCol.className = 'hw-wx-range-col';
+      var maxEl = document.createElement('div');
+      maxEl.className = 'hw-wx-range-max';
+      maxEl.textContent = today.tempMax != null ? today.tempMax + '°' : '--°';
+      var minEl = document.createElement('div');
+      minEl.className = 'hw-wx-range-min';
+      minEl.textContent = today.tempMin != null ? today.tempMin + '°' : '--°';
+      rangeCol.appendChild(maxEl);
+      rangeCol.appendChild(minEl);
+      main.appendChild(rangeCol);
+
+      /* humidity pushed to right */
+      var humCol = document.createElement('div');
+      humCol.className = 'hw-wx-humidity-col';
+      var humLabel = document.createElement('div');
+      humLabel.className = 'hw-wx-hum-label';
+      humLabel.textContent = 'Prec.';
+      var humVal = document.createElement('div');
+      humVal.className = 'hw-wx-hum-val';
+      humVal.textContent = today.precipProb != null ? Math.round(today.precipProb) + '%' : '--';
+      humCol.appendChild(humLabel);
+      humCol.appendChild(humVal);
+      main.appendChild(humCol);
+
+      card.appendChild(main);
+    });
+
+    card.addEventListener('click', function () {
+      var t = document.querySelector('[data-page="meteo"]');
+      if (t) t.click();
+    });
+  }
+
+  /* ── hook: refresh on home tab click ───────────────── */
+  /* handled by core module calling window._homeRefresh() */
+
 })();
 
 /* ════════════════════════════════════════════════════════
@@ -796,49 +1255,9 @@
 
   function $m(id) { return document.getElementById(id); }
 
-  function mkGet(url, cb) {
-    var req = new XMLHttpRequest();
-    req.open('GET', url, true);
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try {
-        var j = JSON.parse(req.responseText);
-        if (req.status >= 200 && req.status < 300) cb(null, j);
-        else cb((j && j.error) || ('HTTP ' + req.status), null);
-      } catch (e) { cb('Invalid response', null); }
-    };
-    req.onerror = function () { cb('Network error', null); };
-    req.send(null);
-  }
-
-  function mkPost(url, body, cb) {
-    var req = new XMLHttpRequest();
-    req.open('POST', url, true);
-    req.setRequestHeader('Content-Type', 'application/json');
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try {
-        var j = JSON.parse(req.responseText);
-        if (req.status >= 200 && req.status < 300) cb(null, j);
-        else cb((j && j.error) || ('HTTP ' + req.status), null);
-      } catch (e) { cb('Invalid response', null); }
-    };
-    req.onerror = function () { cb('Network error', null); };
-    req.send(JSON.stringify(body || {}));
-  }
-
-  function marketToast(msg) {
-    var t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.classList.remove('hidden');
-    void t.offsetWidth;
-    t.classList.add('show');
-    setTimeout(function () {
-      t.classList.remove('show');
-      setTimeout(function () { t.classList.add('hidden'); }, 260);
-    }, 2200);
-  }
+  function mkGet(url, cb)       { window._xhr('GET',  url, null, cb); }
+  function mkPost(url, body, cb){ window._xhr('POST', url, body, cb); }
+  function marketToast(msg)     { window._toast(msg); }
 
   function fmtPrice(v) {
     if (v == null || isNaN(v)) return '—';
@@ -1115,8 +1534,7 @@
   var marketsTab = document.querySelector('[data-page="markets"]');
   if (marketsTab) {
     marketsTab.addEventListener('click', function () {
-      if (!mk.loaded) loadFavorites();
-      else loadFavorites();
+      loadFavorites();
     }, true);
   }
 })();
@@ -1139,49 +1557,9 @@
 
   function $w(id) { return document.getElementById(id); }
 
-  function wxGet(url, cb) {
-    var req = new XMLHttpRequest();
-    req.open('GET', url, true);
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try {
-        var j = JSON.parse(req.responseText);
-        if (req.status >= 200 && req.status < 300) cb(null, j);
-        else cb((j && j.error) || 'HTTP ' + req.status, null);
-      } catch (e) { cb('Invalid response', null); }
-    };
-    req.onerror = function () { cb('Network error', null); };
-    req.send(null);
-  }
-
-  function wxPostSettings(body, cb) {
-    var req = new XMLHttpRequest();
-    req.open('POST', '/api/settings', true);
-    req.setRequestHeader('Content-Type', 'application/json');
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try {
-        var j = JSON.parse(req.responseText);
-        if (req.status >= 200 && req.status < 300) cb(null, j);
-        else cb((j && j.error) || 'HTTP ' + req.status, null);
-      } catch (e) { cb('Invalid response', null); }
-    };
-    req.onerror = function () { cb('Network error', null); };
-    req.send(JSON.stringify(body || {}));
-  }
-
-  function wxToast(msg) {
-    var t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.classList.remove('hidden');
-    void t.offsetWidth;
-    t.classList.add('show');
-    setTimeout(function () {
-      t.classList.remove('show');
-      setTimeout(function () { t.classList.add('hidden'); }, 260);
-    }, 2300);
-  }
+  function wxGet(url, cb)            { window._xhr('GET',  url, null, cb); }
+  function wxPostSettings(body, cb)  { window._xhr('POST', '/api/settings', body, cb); }
+  function wxToast(msg)              { window._toast(msg); }
 
   function locLabel(loc) {
     if (!loc) return '—';
@@ -1275,31 +1653,50 @@
   }
 
   function renderWeather(data, loc) {
-    var cur = data.current || {};
-    var today = data.today || {};
+    var cur      = data.current  || {};
+    var today    = data.today    || {};
     var tomorrow = data.tomorrow || {};
-    var days = data.days || [];
+    var days     = data.days     || [];
+    var isDay    = cur.is_day != null ? cur.is_day : 1;
 
     $w('weather-city').textContent = locLabel(loc);
     $w('weather-subtitle').textContent = 'Weather · ' + (loc.name || 'location');
     $w('weather-current-temp').textContent = temp(cur.temperature_2m);
     $w('weather-current-desc').textContent = weatherCodeLabel(cur.weather_code);
     $w('weather-current-humidity').textContent =
-      (cur.relative_humidity_2m !== undefined && cur.relative_humidity_2m !== null)
-        ? (Math.round(cur.relative_humidity_2m) + '%')
-        : '—';
+      (cur.relative_humidity_2m != null) ? (Math.round(cur.relative_humidity_2m) + '%') : '—';
     $w('weather-current-wind').textContent =
-      (cur.wind_speed_10m !== undefined && cur.wind_speed_10m !== null)
-        ? (Math.round(cur.wind_speed_10m) + ' km/h')
-        : '—';
+      (cur.wind_speed_10m != null) ? (Math.round(cur.wind_speed_10m) + ' km/h') : '—';
+
+    /* large icon in now-card */
+    var iconSlot = $w('weather-current-icon');
+    if (iconSlot && window._wxIcon) iconSlot.innerHTML = window._wxIcon(cur.weather_code, isDay, 48);
 
     $w('weather-today-max').textContent = temp(today.tempMax);
     $w('weather-today-min').textContent = temp(today.tempMin);
     $w('weather-today-desc').textContent = weatherCodeLabel(today.weatherCode);
+    var todayIcon = $w('weather-today-icon');
+    if (todayIcon && window._wxIcon) todayIcon.innerHTML = window._wxIcon(today.weatherCode, 1, 26);
+    var todayPrecip = $w('weather-today-precip');
+    if (todayPrecip) {
+      if (today.precipProb != null) {
+        todayPrecip.innerHTML = (window._wxRainIcon ? window._wxRainIcon(10) : '') + ' ' + Math.round(today.precipProb) + '%';
+        todayPrecip.style.display = '';
+      } else { todayPrecip.style.display = 'none'; }
+    }
 
     $w('weather-tomorrow-max').textContent = temp(tomorrow.tempMax);
     $w('weather-tomorrow-min').textContent = temp(tomorrow.tempMin);
     $w('weather-tomorrow-desc').textContent = weatherCodeLabel(tomorrow.weatherCode);
+    var tomorrowIcon = $w('weather-tomorrow-icon');
+    if (tomorrowIcon && window._wxIcon) tomorrowIcon.innerHTML = window._wxIcon(tomorrow.weatherCode, 1, 26);
+    var tomorrowPrecip = $w('weather-tomorrow-precip');
+    if (tomorrowPrecip) {
+      if (tomorrow.precipProb != null) {
+        tomorrowPrecip.innerHTML = (window._wxRainIcon ? window._wxRainIcon(10) : '') + ' ' + Math.round(tomorrow.precipProb) + '%';
+        tomorrowPrecip.style.display = '';
+      } else { tomorrowPrecip.style.display = 'none'; }
+    }
 
     renderWeatherChart(days);
     render10Days(days);
@@ -1311,26 +1708,16 @@
     if (!el) return;
     if (!window.Chartist) { el.innerHTML = '<div class="form-hint">Grafico non disponibile</div>'; return; }
 
-    var labels = [];
-    var maxS = [];
-    var minS = [];
+    var labels = [], maxS = [], minS = [];
     for (var i = 0; i < days.length && i < 10; i++) {
       labels.push(weekdayLabel(days[i].date));
       maxS.push(days[i].tempMax != null ? parseFloat(days[i].tempMax) : 0);
       minS.push(days[i].tempMin != null ? parseFloat(days[i].tempMin) : 0);
     }
-
     if (wx.chart && wx.chart.detach) { try { wx.chart.detach(); } catch (e) {} }
-
-    wx.chart = new Chartist.Line('#' + elId, {
-      labels: labels,
-      series: [maxS, minS]
-    }, {
-      showPoint: false,
-      lineSmooth: false,
-      fullWidth: true,
-      axisX: { showGrid: false },
-      axisY: { onlyInteger: true, offset: 26 },
+    wx.chart = new Chartist.Line('#' + elId, { labels: labels, series: [maxS, minS] }, {
+      showPoint: false, lineSmooth: false, fullWidth: true,
+      axisX: { showGrid: false }, axisY: { onlyInteger: true, offset: 26 },
       chartPadding: { top: 8, right: 8, bottom: 8, left: 0 }
     });
   }
@@ -1340,16 +1727,44 @@
     if (!list) return;
     list.innerHTML = '';
     for (var i = 0; i < days.length && i < 10; i++) {
-      var d = days[i];
-      var row = document.createElement('div');
-      row.className = 'weather-day-row';
-      row.innerHTML =
-        '<div class="weather-day-name">' + weekdayLabel(d.date) + '</div>' +
-        '<div class="weather-day-summary">' + weatherCodeLabel(d.weatherCode) + '</div>' +
-        '<div class="weather-day-range">' + temp(d.tempMax) + ' / ' + temp(d.tempMin) + '</div>';
-      list.appendChild(row);
+      (function (d) {
+        var row = document.createElement('div');
+        row.className = 'weather-day-row';
+
+        var iconEl = document.createElement('div');
+        iconEl.className = 'weather-day-icon';
+        if (window._wxIcon) iconEl.innerHTML = window._wxIcon(d.weatherCode, 1, 18);
+        row.appendChild(iconEl);
+
+        var nameEl = document.createElement('div');
+        nameEl.className = 'weather-day-name';
+        nameEl.textContent = weekdayLabel(d.date);
+        row.appendChild(nameEl);
+
+        var summaryWrap = document.createElement('div');
+        summaryWrap.style.cssText = '-webkit-box-flex:1;-webkit-flex:1;flex:1;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;gap:4px;';
+        var summaryEl = document.createElement('div');
+        summaryEl.className = 'weather-day-summary';
+        summaryEl.textContent = weatherCodeLabel(d.weatherCode);
+        summaryWrap.appendChild(summaryEl);
+        if (d.precipProb != null && d.precipProb > 0) {
+          var precipEl = document.createElement('div');
+          precipEl.className = 'weather-day-precip';
+          precipEl.innerHTML = (window._wxRainIcon ? window._wxRainIcon(9) : '') + '<span>' + Math.round(d.precipProb) + '%</span>';
+          summaryWrap.appendChild(precipEl);
+        }
+        row.appendChild(summaryWrap);
+
+        var rangeEl = document.createElement('div');
+        rangeEl.className = 'weather-day-range';
+        rangeEl.textContent = temp(d.tempMax) + ' / ' + temp(d.tempMin);
+        row.appendChild(rangeEl);
+
+        list.appendChild(row);
+      })(days[i]);
     }
   }
+
 
   function loadWeatherPage() {
     loadSettingsWeather(function (err) {
@@ -1503,48 +1918,9 @@
   /* ── helpers (local) ────────────────────────────────── */
   function $j(id) { return document.getElementById(id); }
 
-  function jfXhr(url, cb) {
-    var req = new XMLHttpRequest();
-    req.open('GET', url, true);
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try {
-        var j = JSON.parse(req.responseText);
-        req.status >= 200 && req.status < 300 ? cb(null, j) : cb(j.error || 'HTTP ' + req.status, null);
-      } catch (x) { cb('Invalid response', null); }
-    };
-    req.onerror = function () { cb('Network error', null); };
-    req.send(null);
-  }
-
-  function jfPost(url, body, cb) {
-    var req = new XMLHttpRequest();
-    req.open('POST', url, true);
-    req.setRequestHeader('Content-Type', 'application/json');
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try {
-        var j = JSON.parse(req.responseText);
-        req.status >= 200 && req.status < 300 ? cb(null, j) : cb(j.error || 'HTTP ' + req.status, null);
-      } catch (x) { cb('Invalid response', null); }
-    };
-    req.onerror = function () { cb('Network error', null); };
-    req.send(body ? JSON.stringify(body) : null);
-  }
-
-  function jfToast(msg) {
-    // reuse global toast
-    var t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.classList.remove('hidden');
-    void t.offsetWidth;
-    t.classList.add('show');
-    setTimeout(function () {
-      t.classList.remove('show');
-      setTimeout(function () { t.classList.add('hidden'); }, 260);
-    }, 2400);
-  }
+  function jfXhr(url, cb)       { window._xhr('GET',  url, null, cb); }
+  function jfPost(url, body, cb){ window._xhr('POST', url, body, cb); }
+  function jfToast(msg)         { window._toast(msg); }
 
   /* ── load user id ───────────────────────────────────── */
   function ensureUserId(cb) {
@@ -1895,64 +2271,10 @@
   /* ── helpers ────────────────────────────────────────── */
   function $p(id) { return document.getElementById(id); }
 
-  function pxGet(path, cb) {
-    var req = new XMLHttpRequest();
-    req.open('GET', '/api/px' + path, true);
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try {
-        var j = JSON.parse(req.responseText);
-        req.status >= 200 && req.status < 300
-          ? cb(null, j)
-          : cb(j.error || 'HTTP ' + req.status, null);
-      } catch (e) { cb('Invalid response', null); }
-    };
-    req.onerror = function () { cb('Network unreachable', null); };
-    req.send(null);
-  }
-
-  function pxPost(path, body, cb) {
-    var req = new XMLHttpRequest();
-    req.open('POST', '/api/px' + path, true);
-    req.setRequestHeader('Content-Type', 'application/json');
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try {
-        var j = JSON.parse(req.responseText);
-        req.status >= 200 && req.status < 300
-          ? cb(null, j)
-          : cb(j.error || 'HTTP ' + req.status, null);
-      } catch (e) { cb('Invalid response', null); }
-    };
-    req.onerror = function () { cb('Network unreachable', null); };
-    req.send(JSON.stringify(body || {}));
-  }
-
-  function pxPostSettings(body, cb) {
-    var req = new XMLHttpRequest();
-    req.open('POST', '/api/settings', true);
-    req.setRequestHeader('Content-Type', 'application/json');
-    req.onreadystatechange = function () {
-      if (req.readyState !== 4) return;
-      try { var j = JSON.parse(req.responseText); cb(null, j); }
-      catch(e) { cb('Error', null); }
-    };
-    req.onerror = function () { cb('Network error', null); };
-    req.send(JSON.stringify(body));
-  }
-
-  function pxToast(msg) {
-    var t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.classList.remove('hidden');
-    void t.offsetWidth;
-    t.classList.add('show');
-    setTimeout(function () {
-      t.classList.remove('show');
-      setTimeout(function () { t.classList.add('hidden'); }, 260);
-    }, 2600);
-  }
+  function pxGet(path, cb)          { window._xhr('GET',  '/api/px' + path, null, cb); }
+  function pxPost(path, body, cb)   { window._xhr('POST', '/api/px' + path, body, cb); }
+  function pxPostSettings(body, cb) { window._xhr('POST', '/api/settings',  body, cb); }
+  function pxToast(msg)             { window._toast(msg); }
 
   /* ── formatting ─────────────────────────────────────── */
   function fmtBytes(b, decimals) {
@@ -1997,7 +2319,7 @@
       var node = nodes[ni];
       // Node header
       var nodeItem = makeTreeItem('node', node.node, 'node.node', null,
-        '⬡', node.node, node.status || '—', statusClass(node.status));
+        'node', node.node, node.status || '—', statusClass(node.status));
       nodeItem.setAttribute('data-node', node.node);
       tree.appendChild(nodeItem);
 
@@ -2016,7 +2338,7 @@
             vm.name || ('VM ' + vm.vmid),
             vm._type.toUpperCase() + ' ' + vm.vmid,
             { node: node.node, vmid: vm.vmid, type: vm._type, data: vm },
-            vm._type === 'lxc' ? '⬢' : '▣',
+            vm._type === 'lxc' ? 'lxc' : 'vm',
             vm.name || ('VM ' + vm.vmid),
             vm.status || '—',
             statusClass(vm.status));
@@ -2040,7 +2362,7 @@
             st.storage,
             st.type || 'dir',
             { node: node.node, storage: st.storage, data: st },
-            '▪',
+            'disk',
             st.storage,
             st.type || '',
             '');
@@ -2057,13 +2379,21 @@
     tree.classList.remove('hidden');
   }
 
-  function makeTreeItem(kind, name, meta, payload, icon, labelText, metaText, dotCls) {
+  function makeTreeItem(kind, name, meta, payload, iconKey, labelText, metaText, dotCls) {
     var item = document.createElement('div');
     item.className = 'px-tree-item px-' + kind;
 
     var ico = document.createElement('div');
     ico.className = 'px-item-icon';
-    ico.textContent = icon;
+
+    /* SVG icons for Proxmox tree — iOS 9 safe */
+    var svgMap = {
+      'node': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="6" rx="2" stroke="currentColor" stroke-width="1.8"/><rect x="2" y="13" width="20" height="6" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="18" cy="6" r="1" fill="currentColor"/><circle cx="18" cy="16" r="1" fill="currentColor"/></svg>',
+      'vm':   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
+      'lxc':  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 8h8v8H8z" stroke="currentColor" stroke-width="1.4"/></svg>',
+      'disk': '<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3" stroke="currentColor" stroke-width="1.6"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" stroke="currentColor" stroke-width="1.6"/></svg>'
+    };
+    ico.innerHTML = svgMap[iconKey] || svgMap['disk'];
 
     var body = document.createElement('div');
     body.className = 'px-item-body';
@@ -2263,14 +2593,14 @@
       var netOut   = status.netout    || 0;
 
       html += '<div class="px-stat-grid">';
-      html += statCard('CPU', running ? cpuPct + '%' : '—', status.cpus ? status.cpus + ' vCPU' : '', running ? parseFloat(cpuPct)/100 : 0, 'cpu');
-      html += statCard('RAM', fmtBytes(memUsed), fmtBytes(memTot) + ' · ' + memPct, running ? memUsed/memTot : 0, 'mem');
-      html += statCard('Disk R', fmtBytes(diskRead), 'totale lettura', 0, '');
-      html += statCard('Disk W', fmtBytes(diskWrite), 'totale scrittura', 0, '');
-      html += statCard('Net In',  fmtBytes(netIn),  '', 0, '');
-      html += statCard('Net Out', fmtBytes(netOut), '', 0, '');
+      html += statCard('CPU', running ? cpuPct + '%' : '—', status.cpus ? status.cpus + ' vCPU' : '', running ? parseFloat(cpuPct)/100 : 0, 'cpu', 'vm-cpu');
+      html += statCard('RAM', fmtBytes(memUsed), fmtBytes(memTot) + ' · ' + memPct, running ? memUsed/memTot : 0, 'mem', 'vm-mem');
+      html += statCard('Disk R', fmtBytes(diskRead), 'totale lettura', 0, '', 'vm-diskr');
+      html += statCard('Disk W', fmtBytes(diskWrite), 'totale scrittura', 0, '', 'vm-diskw');
+      html += statCard('Net In',  fmtBytes(netIn),  '', 0, '', 'vm-netin');
+      html += statCard('Net Out', fmtBytes(netOut), '', 0, '', 'vm-netout');
       if (status.uptime)
-        html += statCard('Uptime', fmtUptime(status.uptime), '', 0, '');
+        html += statCard('Uptime', fmtUptime(status.uptime), '', 0, '', 'vm-uptime');
       html += '</div>';
 
       // Charts
@@ -2345,16 +2675,47 @@
   }
 
   function updateVMStats(status, detail) {
-    // update stat values in place
-    var cards = detail.querySelectorAll('.px-stat-card');
-    if (!cards.length) return;
-    // simpler: just refresh cpu bar and mem bar by ID if we can
-    // For simplicity reload charts only
-    loadVMCharts(
-      px.selected.node,
-      px.selected.type,
-      px.selected.vmid
-    );
+    var running = status.status === 'running';
+    var paused  = status.status === 'paused';
+
+    /* ── helper: aggiorna una card per data-stat key ── */
+    function patchCard(key, value, sub, fillRatio, fillClass) {
+      var card = detail.querySelector('[data-stat="' + key + '"]');
+      if (!card) return;
+      var valEl = card.querySelector('.px-stat-value');
+      var subEl = card.querySelector('.px-stat-sub');
+      var barEl = card.querySelector('.px-bar-fill');
+      if (valEl) valEl.textContent = value;
+      if (subEl && sub !== undefined) subEl.textContent = sub;
+      if (barEl && fillRatio !== undefined) {
+        var w = Math.min(100, Math.round(fillRatio * 100));
+        barEl.style.width = w + '%';
+      }
+    }
+
+    var cpuPct   = running && status.cpu ? (status.cpu * 100).toFixed(1) : '—';
+    var memUsed  = status.mem    || 0;
+    var memTot   = status.maxmem || 1;
+    var memPct   = running ? ((memUsed / memTot) * 100).toFixed(1) + '%' : '—';
+    var diskRead = status.diskread  || 0;
+    var diskWrite= status.diskwrite || 0;
+    var netIn    = status.netin     || 0;
+    var netOut   = status.netout    || 0;
+
+    patchCard('vm-cpu',    running ? cpuPct + '%' : '—',
+                           status.cpus ? status.cpus + ' vCPU' : '',
+                           running ? parseFloat(cpuPct) / 100 : 0);
+    patchCard('vm-mem',    fmtBytes(memUsed),
+                           fmtBytes(memTot) + ' · ' + memPct,
+                           running ? memUsed / memTot : 0);
+    patchCard('vm-diskr',  fmtBytes(diskRead));
+    patchCard('vm-diskw',  fmtBytes(diskWrite));
+    patchCard('vm-netin',  fmtBytes(netIn));
+    patchCard('vm-netout', fmtBytes(netOut));
+    if (status.uptime) patchCard('vm-uptime', fmtUptime(status.uptime));
+
+    /* Aggiorna anche i grafici */
+    loadVMCharts(px.selected.node, px.selected.type, px.selected.vmid);
   }
 
   function doVMAction(nodeName, vmid, vmType, action, detail) {
@@ -2465,13 +2826,14 @@
   }
 
   /* ── Stat card HTML ─────────────────────────────────── */
-  function statCard(label, value, sub, fillRatio, fillClass) {
+  function statCard(label, value, sub, fillRatio, fillClass, dataKey) {
     var barHtml = '';
     if (fillClass && fillRatio !== undefined && fillRatio >= 0) {
       var w = Math.min(100, Math.round(fillRatio * 100));
       barHtml = '<div class="px-bar-wrap"><div class="px-bar-fill ' + fillClass + '" style="width:' + w + '%"></div></div>';
     }
-    return '<div class="px-stat-card">' +
+    var attr = dataKey ? ' data-stat="' + dataKey + '"' : '';
+    return '<div class="px-stat-card"' + attr + '>' +
       '<div class="px-stat-label">' + escHtml(label) + '</div>' +
       '<div class="px-stat-value">' + escHtml(value) + '</div>' +
       (sub ? '<div class="px-stat-sub">' + escHtml(sub) + '</div>' : '') +
@@ -2612,5 +2974,492 @@
     if (d.px_tokenid) $p('px-tokenid').value = d.px_tokenid;
     if (d.px_token)   $p('px-token').value   = d.px_token;
   });
+
+})();
+
+/* ════════════════════════════════════════════════════════
+   FEATURES MODULE
+   Accordion in Settings: enable/disable tabs + home widget picker.
+   Widget selections are persisted to settings.json (home_widgets).
+   ════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  /* ── feature definitions ─────────────────────────────
+     routes: XHR url substrings to block when disabled.
+     accordion: whether the row is expandable.
+     widgetKey: key used in home_widgets settings array.   */
+  var FEATURES = [
+    { key: 'smarthome', label: 'Smart Home', page: 'smarthome', tab: 'smarthome', routes: ['/api/ha'] },
+    { key: 'meteo',     label: 'Weather',    page: 'meteo',     tab: 'meteo',     routes: ['/api/weather'] },
+    { key: 'jelly',     label: 'Jellyfin',   page: 'jelly',     tab: 'jelly',     routes: ['/api/jf'] },
+    { key: 'markets',   label: 'Markets',    page: 'markets',   tab: 'markets',   routes: ['/api/markets'] },
+    { key: 'server',    label: 'Server',     page: 'server',    tab: 'server',    routes: ['/api/proxmox', '/nodes'] }
+  ];
+
+  /* disabled set: keys of features currently off */
+  var disabled = {};
+
+  /* home_widgets: array of { type, id, label } */
+  var homeWidgets = [];
+
+  /* ── DOM helper ─────────────────────────────────────── */
+  function $f(id) { return document.getElementById(id); }
+
+  /* ── persist ─────────────────────────────────────────── */
+  function saveFeatures() {
+    var keys = [];
+    for (var k in disabled) { if (disabled[k]) keys.push(k); }
+    window._xhr('POST', '/api/settings', { features_disabled: keys }, function () {});
+  }
+
+  function saveWidgets() {
+    window._xhr('POST', '/api/settings', { home_widgets: homeWidgets }, function () {});
+    if (window._homeSetWidgets) window._homeSetWidgets(homeWidgets);
+  }
+
+  function isWidgetAdded(type, id) {
+    for (var i = 0; i < homeWidgets.length; i++) {
+      if (homeWidgets[i].type === type && homeWidgets[i].id === id) return true;
+    }
+    return false;
+  }
+
+  function toggleWidget(type, id, label, btn) {
+    if (isWidgetAdded(type, id)) {
+      /* remove */
+      var next = [];
+      for (var i = 0; i < homeWidgets.length; i++) {
+        if (!(homeWidgets[i].type === type && homeWidgets[i].id === id)) next.push(homeWidgets[i]);
+      }
+      homeWidgets = next;
+      if (btn) { btn.textContent = '+'; btn.classList.remove('added'); }
+    } else {
+      /* add */
+      homeWidgets.push({ type: type, id: id, label: label });
+      if (btn) { btn.textContent = '−'; btn.classList.add('added'); }
+    }
+    saveWidgets();
+  }
+
+  function makeAddBtn(type, id, label) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'feat-widget-add-btn' + (isWidgetAdded(type, id) ? ' added' : '');
+    btn.textContent = isWidgetAdded(type, id) ? '−' : '+';
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      toggleWidget(type, id, label, btn);
+    });
+    return btn;
+  }
+
+  /* ── tab/page show-hide ─────────────────────────────── */
+  function applyFeature(feat, enabled) {
+    var tab  = document.querySelector('[data-page="' + feat.tab + '"]');
+    var page = document.getElementById('page-' + feat.page);
+    var tog  = $f('feat-toggle-' + feat.key);
+    if (enabled) {
+      if (tab)  tab.style.display  = '';
+      if (page) page.style.display = '';
+      if (tog)  tog.classList.add('on');
+    } else {
+      if (tab)  tab.style.display  = 'none';
+      if (page) page.style.display = 'none';
+      if (tog)  tog.classList.remove('on');
+      if (window._currentPage && window._currentPage === feat.page) {
+        var homeTab = document.querySelector('[data-page="home"]');
+        if (homeTab) homeTab.click();
+      }
+    }
+  }
+
+  /* ── XHR interception ───────────────────────────────── */
+  var _origXhr = window._xhr;
+  window._xhr = function (method, url, body, cb) {
+    for (var i = 0; i < FEATURES.length; i++) {
+      var feat = FEATURES[i];
+      if (!disabled[feat.key]) continue;
+      for (var r = 0; r < feat.routes.length; r++) {
+        if (url.indexOf(feat.routes[r]) !== -1) return; /* drop */
+      }
+    }
+    _origXhr(method, url, body, cb);
+  };
+
+  /* ── accordion open/close ───────────────────────────── */
+  var openKey = null; /* at most one open at a time */
+
+  function openAccordion(key) {
+    if (openKey && openKey !== key) closeAccordion(openKey);
+    openKey = key;
+    var acc = $f('feat-acc-'  + key);
+    var body = $f('feat-body-' + key);
+    if (acc)  acc.classList.add('open');
+    if (body) body.classList.remove('hidden');
+    populateAccordion(key);
+  }
+
+  function closeAccordion(key) {
+    if (openKey === key) openKey = null;
+    var acc  = $f('feat-acc-'  + key);
+    var body = $f('feat-body-' + key);
+    if (acc)  acc.classList.remove('open');
+    if (body) body.classList.add('hidden');
+  }
+
+  /* ── accordion content population ──────────────────── */
+
+  function populateAccordion(key) {
+    if (key === 'smarthome') populateSmartHome();
+    else if (key === 'meteo')    populateSingle('meteo',   'weather',  'Weather widget');
+    else if (key === 'jelly')    populateSingle('jelly',   'jellyfin', 'Jellyfin widget');
+    else if (key === 'server')   populateSingle('server',  'server',   'Server widget');
+    else if (key === 'markets')  populateMarkets();
+  }
+
+  /* Single-item sections (Meteo, Jellyfin, Server) */
+  function populateSingle(key, widgetId, widgetLabel) {
+    var list = $f('feat-list-' + key);
+    if (!list || list.dataset.loaded) return;
+    list.dataset.loaded = '1';
+    list.innerHTML = '';
+    var row = document.createElement('div');
+    row.className = 'feat-single-add';
+    var lbl = document.createElement('span');
+    lbl.className = 'feat-single-add-label';
+    lbl.textContent = 'Add to Home screen';
+    row.appendChild(lbl);
+    row.appendChild(makeAddBtn(key, widgetId, widgetLabel));
+    list.appendChild(row);
+  }
+
+  /* Smart Home: fetch entities, group by domain */
+  function populateSmartHome() {
+    var list = $f('feat-list-smarthome');
+    var loader = $f('feat-load-smarthome');
+    if (!list) return;
+    if (list.dataset.loaded) { refreshSmartHomeButtons(); return; }
+
+    if (loader) loader.classList.remove('hidden');
+    list.innerHTML = '';
+
+    _origXhr('GET', '/api/ha/entities', null, function (err, entities) {
+      if (loader) loader.classList.add('hidden');
+      if (err || !Array.isArray(entities) || !entities.length) {
+        list.innerHTML = '<div class="feat-widget-empty">No devices available.</div>';
+        return;
+      }
+      list.dataset.loaded = '1';
+
+      var HA_GROUPS = [
+        { key: 'lights',   label: 'Lights',      domains: ['light'],                      icon: '○' },
+        { key: 'media',    label: 'Media',        domains: ['media_player'],               icon: '▷' },
+        { key: 'switches', label: 'Smart Plug',   domains: ['switch','input_boolean'],     icon: '⌁' },
+        { key: 'climate',  label: 'Climate',      domains: ['climate','fan'],              icon: '◇' },
+        { key: 'covers',   label: 'Covers',       domains: ['cover'],                      icon: '▭' }
+      ];
+
+      function domainOf(eid) { return eid.split('.')[0]; }
+      function friendlyName(e) {
+        return (e.attributes && e.attributes.friendly_name)
+          ? e.attributes.friendly_name
+          : e.entity_id.split('.')[1].replace(/_/g,' ');
+      }
+
+      var hasAny = false;
+      for (var g = 0; g < HA_GROUPS.length; g++) {
+        var grp = HA_GROUPS[g], items = [];
+        for (var i = 0; i < entities.length; i++) {
+          if (grp.domains.indexOf(domainOf(entities[i].entity_id)) !== -1) items.push(entities[i]);
+        }
+        if (!items.length) continue;
+        hasAny = true;
+        var glbl = document.createElement('div');
+        glbl.className = 'feat-widget-group-label';
+        glbl.textContent = grp.label;
+        list.appendChild(glbl);
+
+        for (var k = 0; k < items.length; k++) {
+          (function (entity, icon) {
+            var name = friendlyName(entity);
+            var row  = document.createElement('div');
+            row.className = 'feat-widget-item';
+            row.dataset.entityId = entity.entity_id;
+
+            var left = document.createElement('div');
+            left.className = 'feat-widget-item-left';
+            var ic = document.createElement('span');
+            ic.className = 'feat-widget-item-icon';
+            ic.textContent = icon;
+            var nm = document.createElement('span');
+            nm.className = 'feat-widget-item-name';
+            nm.textContent = name;
+            left.appendChild(ic);
+            left.appendChild(nm);
+            row.appendChild(left);
+            row.appendChild(makeAddBtn('smarthome', entity.entity_id, name));
+            list.appendChild(row);
+          })(items[k], grp.icon);
+        }
+      }
+      if (!hasAny) {
+        list.innerHTML = '<div class="feat-widget-empty">No devices available.</div>';
+      }
+    });
+  }
+
+  /* Refresh +/− button states after homeWidgets changes (without re-fetching) */
+  function refreshSmartHomeButtons() {
+    var list = $f('feat-list-smarthome');
+    if (!list) return;
+    var btns = list.querySelectorAll('.feat-widget-add-btn');
+    for (var i = 0; i < btns.length; i++) {
+      var row = btns[i].parentNode;
+      var entityId = row && row.dataset && row.dataset.entityId;
+      if (!entityId) continue;
+      var added = isWidgetAdded('smarthome', entityId);
+      btns[i].textContent = added ? '−' : '+';
+      if (added) btns[i].classList.add('added');
+      else btns[i].classList.remove('added');
+    }
+  }
+
+  /* Markets: fetch favorites list */
+  function populateMarkets() {
+    var list   = $f('feat-list-markets');
+    var loader = $f('feat-load-markets');
+    if (!list) return;
+
+    /* always reload to stay in sync with favorites */
+    list.innerHTML = '';
+    list.dataset.loaded = '';
+    if (loader) loader.classList.remove('hidden');
+
+    _origXhr('GET', '/api/markets/favorites', null, function (err, data) {
+      if (loader) loader.classList.add('hidden');
+      list.dataset.loaded = '1';
+      var items = (!err && data && Array.isArray(data.items)) ? data.items : [];
+
+      if (!items.length) {
+        list.innerHTML = '<div class="feat-widget-empty">No favourites yet. Add symbols from the Markets tab.</div>';
+        return;
+      }
+
+      for (var i = 0; i < items.length; i++) {
+        (function (item) {
+          var id    = item.symbol;
+          var label = (item.name || item.symbol) + ' (' + item.symbol + ')';
+          var row   = document.createElement('div');
+          row.className = 'feat-widget-item';
+          row.dataset.symbolId = id;
+
+          var left = document.createElement('div');
+          left.className = 'feat-widget-item-left';
+          var ic = document.createElement('span');
+          ic.className = 'feat-widget-item-icon';
+          ic.textContent = '◬';
+          var nm = document.createElement('span');
+          nm.className = 'feat-widget-item-name';
+          nm.textContent = item.symbol + (item.name ? ' · ' + item.name : '');
+          left.appendChild(ic);
+          left.appendChild(nm);
+          row.appendChild(left);
+          row.appendChild(makeAddBtn('markets', id, label));
+          list.appendChild(row);
+        })(items[i]);
+      }
+    });
+  }
+
+  /* ── toggle click handlers ──────────────────────────── */
+  function bindFeature(feat) {
+    /* toggle */
+    var tog = $f('feat-toggle-' + feat.key);
+    if (tog) {
+      tog.addEventListener('click', function (e) {
+        e.stopPropagation(); /* prevent accordion open */
+        var isEnabled = !disabled[feat.key];
+        if (isEnabled) disabled[feat.key] = true;
+        else delete disabled[feat.key];
+        applyFeature(feat, !disabled[feat.key]);
+        saveFeatures();
+      });
+    }
+
+    /* accordion header */
+    var hdr = $f('feat-hdr-' + feat.key);
+    if (hdr) {
+      hdr.addEventListener('click', function (e) {
+        /* ignore clicks on the toggle itself */
+        if (e.target && (e.target.classList.contains('power-toggle') ||
+            e.target.classList.contains('power-knob'))) return;
+        var body = $f('feat-body-' + feat.key);
+        if (body && body.classList.contains('hidden')) {
+          openAccordion(feat.key);
+        } else {
+          closeAccordion(feat.key);
+        }
+      });
+    }
+  }
+
+  for (var bi = 0; bi < FEATURES.length; bi++) {
+    bindFeature(FEATURES[bi]);
+  }
+
+  /* ── When Markets favorites change externally, clear cache ── */
+  /* Hook into the markets toggle endpoint response so the accordion
+     re-fetches the updated list next time it opens.              */
+  (function () {
+    var _xhrOrig2 = window._xhr;
+    window._xhr = function (method, url, body, cb) {
+      if (url.indexOf('/api/markets/favorites/toggle') !== -1) {
+        var wrapped = function (err, data) {
+          if (!err) {
+            /* invalidate markets accordion cache */
+            var list = $f('feat-list-markets');
+            if (list) { list.dataset.loaded = ''; }
+            /* also remove any home widget for a symbol that was unfavorited */
+            if (data && !data.isFavorite && body && body.symbol) {
+              var sym = (body.symbol || '').toUpperCase();
+              var next = [];
+              var changed = false;
+              for (var i = 0; i < homeWidgets.length; i++) {
+                if (homeWidgets[i].type === 'markets' && homeWidgets[i].id === sym) {
+                  changed = true;
+                } else {
+                  next.push(homeWidgets[i]);
+                }
+              }
+              if (changed) {
+                homeWidgets = next;
+                saveWidgets();
+              }
+            }
+          }
+          if (cb) cb(err, data);
+        };
+        _xhrOrig2(method, url, body, wrapped);
+        return;
+      }
+      _xhrOrig2(method, url, body, cb);
+    };
+  })();
+
+  /* ── load initial state from settings ───────────────── */
+  window._onSettingsLoad(function (data) {
+    var list = Array.isArray(data.features_disabled) ? data.features_disabled : [];
+    disabled = {};
+    for (var di = 0; di < list.length; di++) disabled[list[di]] = true;
+    homeWidgets = Array.isArray(data.home_widgets) ? data.home_widgets : [];
+
+    for (var ai = 0; ai < FEATURES.length; ai++) {
+      applyFeature(FEATURES[ai], !disabled[FEATURES[ai].key]);
+    }
+
+    /* notify HOME module so it can render immediately */
+    if (window._homeSetWidgets) window._homeSetWidgets(homeWidgets);
+  });
+
+  /* ── first paint defaults (all enabled) ─────────────── */
+  for (var ii = 0; ii < FEATURES.length; ii++) {
+    applyFeature(FEATURES[ii], true);
+  }
+
+})();
+
+/* ════════════════════════════════════════════════════════
+   APPEARANCE MODULE — ES5, iOS 9 safe
+   Manages: light/dark theme + status bar visibility.
+   Persists to localStorage (supported on iOS 9+ Safari).
+   ════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var LS_THEME  = 'gres_theme';      /* 'light' | 'dark' */
+  var LS_SBAR   = 'gres_statusbar';  /* 'hidden' | 'visible' */
+
+  /* ── safe localStorage helpers (iOS 9 private mode may throw) ── */
+  function lsGet(key) {
+    try { return localStorage.getItem(key); } catch(e) { return null; }
+  }
+  function lsSet(key, val) {
+    try { localStorage.setItem(key, val); } catch(e) {}
+  }
+
+  /* ── DOM refs ──────────────────────────────────────── */
+  var htmlEl      = document.documentElement;
+  var bodyEl      = document.body;
+  var statusBar   = document.getElementById('status-bar');
+  var appEl       = document.getElementById('app');
+
+  var themeToggle  = document.getElementById('toggle-light-theme');
+  var sbarToggle   = document.getElementById('toggle-status-bar');
+
+  /* ── Apply theme ─────────────────────────────────── */
+  function applyTheme(isLight) {
+    if (isLight) {
+      htmlEl.className = (htmlEl.className || '').replace(/\blight\b/g, '') + ' light';
+    } else {
+      htmlEl.className = (htmlEl.className || '').replace(/\blight\b/g, '');
+    }
+    /* sync toggle knob */
+    if (themeToggle) {
+      if (isLight) themeToggle.classList.add('on');
+      else         themeToggle.classList.remove('on');
+    }
+  }
+
+  /* ── Apply status bar ────────────────────────────── */
+  function applyStatusBar(isVisible) {
+    if (statusBar) {
+      if (isVisible) {
+        statusBar.classList.remove('hidden-bar');
+        bodyEl.className = (bodyEl.className || '').replace(/\bstatusbar-hidden\b/g, '');
+        /* restore #app top */
+        appEl.style.top = '42px';
+      } else {
+        statusBar.classList.add('hidden-bar');
+        if (bodyEl.className.indexOf('statusbar-hidden') === -1) {
+          bodyEl.className = (bodyEl.className || '') + ' statusbar-hidden';
+        }
+        appEl.style.top = '0';
+      }
+    }
+    /* sync toggle knob — ON means "visible" */
+    if (sbarToggle) {
+      if (isVisible) sbarToggle.classList.add('on');
+      else           sbarToggle.classList.remove('on');
+    }
+  }
+
+  /* ── Init from localStorage ──────────────────────── */
+  var savedTheme = lsGet(LS_THEME);
+  var savedSbar  = lsGet(LS_SBAR);
+
+  /* Default: dark theme, status bar visible */
+  var isLight   = (savedTheme === 'light');
+  var sbarVisible = (savedSbar !== 'hidden'); /* default visible */
+
+  applyTheme(isLight);
+  applyStatusBar(sbarVisible);
+
+  /* ── Toggle handlers ─────────────────────────────── */
+  if (themeToggle) {
+    themeToggle.addEventListener('click', function () {
+      isLight = !isLight;
+      applyTheme(isLight);
+      lsSet(LS_THEME, isLight ? 'light' : 'dark');
+    });
+  }
+
+  if (sbarToggle) {
+    sbarToggle.addEventListener('click', function () {
+      sbarVisible = !sbarVisible;
+      applyStatusBar(sbarVisible);
+      lsSet(LS_SBAR, sbarVisible ? 'visible' : 'hidden');
+    });
+  }
 
 })();

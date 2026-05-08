@@ -5,7 +5,7 @@ var router  = express.Router();
 var fs      = require('fs');
 var path    = require('path');
 var YahooFinance = require('yahoo-finance2').default;
-var yf           = new YahooFinance();
+var yf           = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
 
 var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
@@ -26,7 +26,9 @@ function readSettings() {
 
 function writeSettings(data) {
   ensureDataDir();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+  var tmp = DATA_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.renameSync(tmp, DATA_FILE);
 }
 
 function getFavorites() {

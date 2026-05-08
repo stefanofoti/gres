@@ -340,6 +340,93 @@ router.get('/play/stream', function (req, res) {
 });
 
 /**
+ * GET /api/jf/home-summary
+ * Returns in a single call:
+ *   - totalMovies, totalSeries
+ *   - recentMovies: last 3 movies added (id, name, year, imageTag)
+ * Used by the Home tab widget.
+ */
+router.get('/home-summary', function (req, res) {
+  var cfg = getJFConfig();
+  if (!cfg.url || !cfg.token) {
+    return res.status(400).json({ error: 'Jellyfin non configurato' });
+  }
+
+  /* Step 1: resolve userId */
+  jfFetch('/Users', cfg, function (err, users) {
+    if (err || !Array.isArray(users) || !users.length) {
+      return res.status(502).json({ error: err || 'Nessun utente' });
+    }
+    var user = users[0];
+    for (var i = 0; i < users.length; i++) {
+      if (users[i].Policy && users[i].Policy.IsAdministrator) { user = users[i]; break; }
+    }
+    var uid = user.Id;
+    var base = '/Users/' + uid + '/Items';
+    var done = 0, total = 3;
+    var results = {};
+    var failed = null;
+
+    function finish(key, val) {
+      if (failed) return;
+      results[key] = val;
+      done++;
+      if (done === total) {
+        res.json({
+          totalMovies:  results.totalMovies,
+          totalSeries:  results.totalSeries,
+          recentMovies: results.recentMovies
+        });
+      }
+    }
+
+    function fail(e) {
+      if (failed) return;
+      failed = e;
+      req.log.error({ err: e }, 'jf home-summary failed');
+      res.status(502).json({ error: e });
+    }
+
+    /* count movies */
+    jfFetch(base + '?IncludeItemTypes=Movie&Recursive=true&Limit=0', cfg, function (e, d) {
+      if (e) return fail(e);
+      finish('totalMovies', d.TotalRecordCount || 0);
+    });
+
+    /* count series */
+    jfFetch(base + '?IncludeItemTypes=Series&Recursive=true&Limit=0', cfg, function (e, d) {
+      if (e) return fail(e);
+      finish('totalSeries', d.TotalRecordCount || 0);
+    });
+
+    /* last 3 movies by DateCreated desc */
+    var recentQs = base +
+      '?IncludeItemTypes=Movie' +
+      '&Recursive=true' +
+      '&SortBy=DateCreated' +
+      '&SortOrder=Descending' +
+      '&Limit=3' +
+      '&Fields=ProductionYear' +
+      '&ImageTypeLimit=1' +
+      '&EnableImageTypes=Primary';
+
+    jfFetch(recentQs, cfg, function (e, d) {
+      if (e) return fail(e);
+      var items = (d.Items || []).map(function (it) {
+        var tag = it.ImageTags && it.ImageTags.Primary ? it.ImageTags.Primary : null;
+        return {
+          id:       it.Id,
+          name:     it.Name,
+          year:     it.ProductionYear || null,
+          imageTag: tag
+        };
+      });
+      finish('recentMovies', items);
+    });
+  });
+});
+
+/**
  * GET /api/jf/image/:itemId[?type=Primary&maxH=400]
  * Proxies a Jellyfin cover image, keeping the API key server-side and
  * adding a 24-hour Cache-Control header so the browser caches covers.
