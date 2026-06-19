@@ -1629,7 +1629,7 @@
     }
   }
 
-  function loadForecastForLocation(loc) {
+  function loadForecastForLocation(loc, forceRefresh) {
     if (!loc) return;
     $w('weather-loading').classList.remove('hidden');
     $w('weather-error').classList.add('hidden');
@@ -1638,6 +1638,10 @@
     var url = '/api/weather/forecast?lat=' + encodeURIComponent(loc.latitude) +
       '&lon=' + encodeURIComponent(loc.longitude) +
       '&timezone=' + encodeURIComponent(loc.timezone || 'auto');
+    
+    if (forceRefresh) {
+      url += '&force=true';
+    }
 
     wxGet(url, function (err, data) {
       $w('weather-loading').classList.add('hidden');
@@ -1873,6 +1877,13 @@
 
   $w('weather-retry').addEventListener('click', function () {
     loadWeatherPage();
+  });
+
+  $w('weather-refresh-btn').addEventListener('click', function () {
+    var loc = wx.transientLocation || wx.defaultLocation;
+    if (loc) {
+      loadForecastForLocation(loc, true);
+    }
   });
 
   document.querySelector('[data-page="meteo"]').addEventListener('click', function () {
