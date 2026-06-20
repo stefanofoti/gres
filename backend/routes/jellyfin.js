@@ -54,7 +54,8 @@ function jfHeaders(token) {
   return {
     'X-Emby-Token':  token,
     'Content-Type':  'application/json',
-    'Accept':        'application/json'
+    'Accept':        'application/json',
+    'Connection':    'close'
   };
 }
 

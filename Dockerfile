@@ -1,5 +1,5 @@
 # ── Stage 1: deps ─────────────────────────────────────────────────────────────
-FROM node:24-alpine AS deps
+FROM node:22-alpine AS deps
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 # ── Stage 2: runtime ───────────────────────────────────────────────────────────
-FROM node:24-alpine AS runtime
+FROM node:22-alpine AS runtime
 
 # Metadati OCI standard
 LABEL org.opencontainers.image.title="gres" \
