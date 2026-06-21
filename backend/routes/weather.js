@@ -22,6 +22,15 @@ function getCacheFilePath(key) {
   return path.join(CACHE_DIR, sanitized + '.json');
 }
 
+function weatherHeaders() {
+  return {
+    'User-Agent': 'gres/0.1',
+    'Content-Type':  'application/json',
+    'Accept':        'application/json',
+    'Connection':    'close'
+  };
+}
+
 function readWeatherCache(key) {
   try {
     var filePath = getCacheFilePath(key);
@@ -81,7 +90,7 @@ router.get('/home-summary', function (req, res) {
     '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
     '&forecast_days=1';
 
-  fetch(url, { timeout: 30000 })
+  fetch(url, { headers: weatherHeaders(), timeout: 30000 })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -118,7 +127,7 @@ router.get('/search', function (req, res) {
     encodeURIComponent(q) +
     '&count=8&language=it&format=json';
 
-  fetch(url, { timeout: 30000 })
+  fetch(url, { headers: weatherHeaders(), timeout: 30000 })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -176,7 +185,7 @@ router.get('/forecast', function (req, res) {
     '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset' +
     '&forecast_days=10';
 
-  fetch(url, { timeout: 30000 })
+  fetch(url, { headers: weatherHeaders(), timeout: 30000 })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();

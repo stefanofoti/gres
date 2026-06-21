@@ -16,7 +16,7 @@ LABEL org.opencontainers.image.title="gres" \
 
 WORKDIR /app
 
-RUN addgroup -g 1001 -S gres && adduser -u 1001 -S gres -G gres
+RUN groupadd -g 1001 gres && useradd -u 1001 -g gres -m -s /bin/bash gres
 
 COPY --from=deps /app/node_modules ./node_modules
 

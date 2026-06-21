@@ -7,6 +7,9 @@ services:
     container_name: gres
     deploy:
       replicas: 1
+    #dns: # If resolving issues occur, you can add public DNS servers here
+    #  - 8.8.8.8
+    #  - 1.1.1.1
     volumes:
       - gres_data:/app/data
     restart: unless-stopped
