@@ -182,6 +182,203 @@
       h < 21 ? 'Good evening'   : 'Good night';
   })();
 
+  /* ── Generic PIN prompt ─────────────────────────────────
+     A single overlay reused for two purposes:
+       - 'settings' scope: gates landing on the Settings tab
+         (SETTINGS_PIN). Once unlocked it stays unlocked for
+         the rest of this page load (in-memory only — a full
+         reload re-locks it).
+       - 'devices'  scope: gates interacting with smart
+         devices flagged as locked (DEVICES_PIN). This one is
+         intentionally NOT cached: every interaction with a
+         locked device asks for the PIN again.
+     Digits are entered via an in-app numeric keypad — the
+     system keyboard is never invoked. This is deliberate: on
+     iPad, Safari shows a full QWERTY keyboard for type="tel"
+     inputs (only iPhone gets a numeric-only pad there), so a
+     real on-screen numpad is the only way to guarantee number
+     keys everywhere. The digits typed are masked as dots and
+     never rendered; the prompt auto-submits as soon as the
+     expected number of digits (reported by the backend, the
+     value itself never is) has been entered.                 */
+  var pinOverlay  = $('pin-overlay');
+  var pinTitleEl  = $('pin-title');
+  var pinMsgEl    = $('pin-msg');
+  var pinDots     = $('pin-dots');
+  var pinKeypad   = $('pin-keypad');
+  var pinError    = $('pin-error');
+  var pinSubmitEl = $('pin-submit');
+  var pinCancelEl = $('pin-cancel');
+  var pinBackEl   = $('pin-backspace');
+
+  /* All of the elements above must exist for the PIN prompt to work.
+     If even one is missing (e.g. an HTML/JS version mismatch from a
+     stale cache after an update), pinReady stays false and every
+     entry point below safely no-ops instead of throwing — a locked
+     Settings tab or device simply won't be reachable until the page
+     is refreshed with matching assets. */
+  var pinReady = !!(pinOverlay && pinTitleEl && pinMsgEl && pinDots && pinKeypad &&
+                    pinError && pinSubmitEl && pinCancelEl && pinBackEl);
+  if (!pinReady && window.console && window.console.warn) {
+    window.console.warn('PIN prompt markup missing or out of date — clear cache / reload.');
+  }
+
+  var pinValue = '';            /* digits entered so far, in memory only */
+  var pinStatusCache = {};      /* scope -> { required, length } */
+  var pinState = { scope: 'settings', length: 0, onSuccess: null, onCancel: null };
+
+  function fetchPinStatus(scope, cb) {
+    if (pinStatusCache[scope]) { cb(pinStatusCache[scope]); return; }
+    xhr('GET', API + '/api/auth/pin-status?scope=' + scope, null, function (err, data) {
+      var res = (!err && data) ? data : { required: false, length: 0 };
+      pinStatusCache[scope] = res;
+      cb(res);
+    });
+  }
+
+  /* Pre-warm the cache for both scopes as soon as the app loads, well
+     before the user taps anything, so the prompt can open instantly
+     with the right number of dot slots. */
+  fetchPinStatus('settings', function () {});
+  fetchPinStatus('devices',  function () {});
+
+  function renderPinDots() {
+    if (!pinReady) return;
+    var n     = pinValue.length;
+    var slots = Math.max(pinState.length || 0, n, 4);
+    var html  = '';
+    for (var i = 0; i < slots; i++) {
+      html += '<span class="pin-dot' + (i < n ? ' filled' : '') + '"></span>';
+    }
+    pinDots.innerHTML = html;
+  }
+
+  function closePinOverlay() {
+    if (!pinReady) return;
+    pinOverlay.classList.add('hidden');
+    pinValue = '';
+    renderPinDots();
+  }
+
+  /**
+   * Show the PIN prompt for a given scope.
+   *
+   * @param {string}   scope     'settings' | 'devices'
+   * @param {string}   title
+   * @param {string}   msg
+   * @param {Function} onSuccess called with no args once the PIN is verified
+   * @param {Function} [onCancel]
+   */
+  function openPinPrompt(scope, title, msg, onSuccess, onCancel) {
+    /* Markup missing (stale cache): fail safe by NOT granting access —
+       better a non-functional lock than an accidental bypass. */
+    if (!pinReady) {
+      toast('Unable to show the PIN prompt. Please reload the page.');
+      return;
+    }
+
+    pinState.scope     = scope;
+    pinState.onSuccess = onSuccess;
+    pinState.onCancel  = onCancel || null;
+    pinTitleEl.textContent = title;
+    pinMsgEl.textContent   = msg;
+    pinError.classList.add('hidden');
+    pinValue = '';
+
+    fetchPinStatus(scope, function (status) {
+      pinState.length = status.length || 0;
+      if (!status.required) {
+        /* Nothing configured for this scope: proceed straight away. */
+        if (onSuccess) onSuccess();
+        return;
+      }
+      renderPinDots();
+      pinOverlay.classList.remove('hidden');
+    });
+  }
+
+  function submitPin() {
+    if (!pinReady) return;
+    var pin = pinValue || '';
+    if (!pin) return;
+    xhr('POST', API + '/api/auth/verify-pin', { scope: pinState.scope, pin: pin },
+      function (err, data) {
+        if (!err && data && data.ok) {
+          var cb = pinState.onSuccess;
+          closePinOverlay();
+          if (cb) cb();
+        } else {
+          pinError.textContent = (data && data.error) ? data.error : 'Wrong PIN';
+          pinError.classList.remove('hidden');
+          pinValue = '';
+          renderPinDots();
+        }
+      }
+    );
+  }
+
+  function pinAppendDigit(d) {
+    if (!pinReady) return;
+    if (pinState.length > 0 && pinValue.length >= pinState.length) return;
+    pinValue += d;
+    renderPinDots();
+    if (pinState.length > 0 && pinValue.length >= pinState.length) submitPin();
+  }
+
+  function pinBackspace() {
+    if (!pinReady) return;
+    pinValue = pinValue.slice(0, -1);
+    renderPinDots();
+  }
+
+if (pinReady) {
+    var bindFastInteraction = function (el, handler) {
+      el.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        handler(e);
+      }, false);
+      
+      el.addEventListener('click', function (e) {
+        handler(e);
+      }, false);
+    };
+
+    bindFastInteraction(pinSubmitEl, submitPin);
+    
+    bindFastInteraction(pinCancelEl, function () {
+      var cb = pinState.onCancel;
+      closePinOverlay();
+      if (cb) cb();
+    });
+    
+    bindFastInteraction(pinBackEl, pinBackspace);
+
+    var handleKeypadInput = function (e) {
+      var t = e.target;
+      while (t && t !== pinKeypad && !t.getAttribute('data-digit')) {
+        t = t.parentNode;
+      }
+      if (t && t.getAttribute && t.getAttribute('data-digit') != null) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        pinAppendDigit(t.getAttribute('data-digit'));
+      }
+    };
+
+    pinKeypad.addEventListener('touchstart', function (e) {
+      handleKeypadInput(e);
+    }, false);
+
+    pinKeypad.addEventListener('click', function (e) {
+      handleKeypadInput(e);
+    }, false);
+  }
+
+  /* Exposed so other modules (Smart Home page, Home widgets) can gate
+     a device interaction without duplicating any of the above. */
+  window._openPinPrompt = openPinPrompt;
+
   /* ── Page navigation ────────────────────────────────── */
   function showPage(id) {
     // Hide all pages and deactivate all tabs
@@ -200,11 +397,22 @@
     if (id === 'settings')  loadSettings();
   }
 
+  /* Settings tab gate — uses the 'settings' scope, cached for the page
+     session: once unlocked, re-opening Settings doesn't ask again. */
+  var settingsUnlocked = false;
+
   var tabEls = document.querySelectorAll('.tab');
   for (var _ti = 0; _ti < tabEls.length; _ti++) {
     (function (tab) {
       tab.addEventListener('click', function () {
         var id = tab.getAttribute('data-page');
+        if (id === 'settings' && !settingsUnlocked) {
+          openPinPrompt('settings', 'Settings locked', 'Enter the PIN to access Settings.', function () {
+            settingsUnlocked = true;
+            showPage('settings');
+          });
+          return;
+        }
         showPage(id);
         if (id === 'home' && window._homeRefresh) window._homeRefresh();
       });
@@ -373,6 +581,14 @@
   var _sliderBrTimer, _sliderCtTimer, _colorSendTimer;
 
   function openLightSheet(entity) {
+    if (window._isDeviceLocked(entity.entity_id)) {
+      window._guardDeviceAction(entity.entity_id, function () { doOpenLightSheet(entity); });
+      return;
+    }
+    doOpenLightSheet(entity);
+  }
+
+  function doOpenLightSheet(entity) {
     state.sheet.entity = entity;
     state.sheet.open = true;
 
@@ -614,31 +830,131 @@
     }, function(err, data) { cb(err, data); });
   }
 
-  /* ── smart home load ────────────────────────────────── */
-  function loadSmartHome(force) {
-    if (!state.loaded || force) {
+  /* ── smart home load / refresh ──────────────────────── */
+  function updateSmartHomeSubtitle(summary, entities) {
+    var total  = summary && summary.total  != null ? summary.total  : entities.length;
+    var active = summary && summary.active != null ? summary.active : 0;
+    if (summary == null) {
+      active = 0;
+      for (var i = 0; i < entities.length; i++) { if (isOn(entities[i])) active++; }
+    }
+    $('smarthome-subtitle').textContent = total + ' devices · ' + active + ' active';
+  }
+
+  function mergeEntityStates(target, incoming) {
+    var index = {};
+    for (var i = 0; i < target.length; i++) index[target[i].entity_id] = target[i];
+    for (var j = 0; j < incoming.length; j++) {
+      var src = incoming[j];
+      var dst = index[src.entity_id];
+      if (dst) {
+        dst.state = src.state;
+        dst.attributes = src.attributes;
+        if (src.last_changed) dst.last_changed = src.last_changed;
+        if (src.last_updated) dst.last_updated = src.last_updated;
+      } else {
+        target.push(src);
+        index[src.entity_id] = src;
+      }
+    }
+  }
+
+  function syncCardFromEntity(card, entity) {
+    var eid = entity.entity_id;
+    if (state.toggling[eid]) return;
+
+    var on = isOn(entity);
+    var unavail = entity.state === 'unavailable';
+    var domain = domainOf(eid);
+    var isLight = domain === 'light';
+
+    card.className = 'device-card' + (on ? ' on' : '') + (unavail ? ' unavail' : '');
+
+    if (isLight && on) applyCardColor(card, entity);
+    else if (isLight) {
+      card.style.background = '';
+      card.style.borderColor = '';
+    }
+
+    var stateEl = card.querySelector('.card-state');
+    if (stateEl) stateEl.textContent = buildStateText(entity);
+  }
+
+  function syncSmartHomeCards(entities) {
+    var container = $('smarthome-content');
+    if (!container) return;
+    var map = {};
+    for (var i = 0; i < entities.length; i++) map[entities[i].entity_id] = entities[i];
+    var cards = container.querySelectorAll('.device-card[data-eid]');
+    for (var c = 0; c < cards.length; c++) {
+      var card = cards[c];
+      var eid = card.getAttribute('data-eid');
+      if (map[eid]) syncCardFromEntity(card, map[eid]);
+    }
+  }
+
+  var _haRefreshBusy = false;
+
+  function refreshHADevices(options, cb) {
+    options = options || {};
+    var silent = !!options.silent;
+    var forceRender = !!options.forceRender;
+
+    if (_haRefreshBusy) {
+      if (cb) cb('busy');
+      return;
+    }
+    _haRefreshBusy = true;
+
+    if (!silent && (!state.loaded || forceRender) && state.page === 'smarthome') {
       show($('smarthome-loading'));
       hide($('smarthome-error'));
       hide($('smarthome-content'));
     }
-    xhr('GET', API + '/api/ha/entities', null, function (err, entities) {
+
+    xhr('GET', API + '/api/ha/devices', null, function (err, data) {
+      _haRefreshBusy = false;
       hide($('smarthome-loading'));
-      if (err || !Array.isArray(entities)) {
-        if (!state.loaded) {
+
+      if (err || !data || !Array.isArray(data.entities)) {
+        if (!state.loaded && !silent) {
           show($('smarthome-error'));
           $('smarthome-error-msg').textContent = err || 'Unable to load';
         }
+        if (cb) cb(err || 'Unable to load');
         return;
       }
-      state.entities = entities;
-      state.loaded = true;
-      var total = entities.length, active = 0;
-      for (var i = 0; i < entities.length; i++) { if (isOn(entities[i])) active++; }
-      $('smarthome-subtitle').textContent = total + ' devices · ' + active + ' active';
-      renderGroups(entities);
-      show($('smarthome-content'));
+
+      var entities = data.entities;
+      var summary = data.summary || null;
+
+      if (!state.loaded || forceRender) {
+        state.entities = entities;
+        state.loaded = true;
+        updateSmartHomeSubtitle(summary, entities);
+        renderGroups(entities);
+        show($('smarthome-content'));
+      } else {
+        mergeEntityStates(state.entities, entities);
+        updateSmartHomeSubtitle(summary, state.entities);
+        syncSmartHomeCards(state.entities);
+      }
+
+      if (window._homeSyncHAEntities) window._homeSyncHAEntities(entities, summary);
+      if (cb) cb(null, data);
     });
   }
+
+  function loadSmartHome(force) {
+    refreshHADevices({
+      silent: state.loaded && !force,
+      forceRender: !!force
+    });
+  }
+
+  window._syncHACard = syncCardFromEntity;
+  window._mergeHAEntities = mergeEntityStates;
+  window._refreshHADevices = refreshHADevices;
 
   /* ── render groups ──────────────────────────────────── */
   function renderGroups(entities) {
@@ -759,6 +1075,15 @@
   function toggleEntity(entity, card, stateEl) {
     var eid = entity.entity_id;
     if (state.toggling[eid]) return;
+    if (window._isDeviceLocked(eid)) {
+      window._guardDeviceAction(eid, function () { doToggleEntity(entity, card, stateEl); });
+      return;
+    }
+    doToggleEntity(entity, card, stateEl);
+  }
+
+  function doToggleEntity(entity, card, stateEl) {
+    var eid = entity.entity_id;
     var wasOn  = card.classList.contains('on');
     var domain = domainOf(eid);
     setCardState(card, stateEl, !wasOn);
@@ -777,6 +1102,17 @@
   function toggleLightFromCard(entity, card, stateEl, leftBtn, rightBtn) {
     var eid = entity.entity_id;
     if (state.toggling[eid]) return;
+    if (window._isDeviceLocked(eid)) {
+      window._guardDeviceAction(eid, function () {
+        doToggleLightFromCard(entity, card, stateEl, leftBtn, rightBtn);
+      });
+      return;
+    }
+    doToggleLightFromCard(entity, card, stateEl, leftBtn, rightBtn);
+  }
+
+  function doToggleLightFromCard(entity, card, stateEl, leftBtn, rightBtn) {
+    var eid = entity.entity_id;
 
     var wasOn = entity.state === 'on';
     var nextOn = !wasOn;
@@ -843,6 +1179,45 @@
     });
   }
 
+  /* ── Smart device protection ────────────────────────────
+     A device is "locked" when its entity_id is listed in the
+     'ha_protected_entities' setting (managed from the new
+     Settings → "Smart device protection" section). Locked
+     devices require the DEVICES_PIN before every interaction,
+     from both the Home tab and the Smart Home tab.            */
+  var protectedEntities = {};
+
+  window._onSettingsLoad(function (data) {
+    var list = Array.isArray(data.ha_protected_entities) ? data.ha_protected_entities : [];
+    protectedEntities = {};
+    for (var i = 0; i < list.length; i++) protectedEntities[list[i]] = true;
+  });
+
+  window._isDeviceLocked = function (entityId) {
+    return !!protectedEntities[entityId];
+  };
+
+  /* Settings → "Smart device protection" updates this in place so the
+     rest of the app sees the new lock state immediately (no reload). */
+  window._setDeviceLocked = function (entityId, locked) {
+    if (locked) protectedEntities[entityId] = true;
+    else delete protectedEntities[entityId];
+  };
+
+  /**
+   * Run `action` immediately if the device isn't locked, otherwise ask
+   * for the DEVICES_PIN first (every time — never cached).
+   *
+   * @param {string}   entityId
+   * @param {Function} action   called with no args once authorised
+   * @param {Function} [onCancel]
+   */
+  window._guardDeviceAction = function (entityId, action, onCancel) {
+    if (!window._isDeviceLocked(entityId)) { action(); return; }
+    window._openPinPrompt('devices', 'Locked device',
+      'Enter the PIN to control this device.', action, onCancel);
+  };
+
   $('btn-save-ha').addEventListener('click', function () {
     var url   = ($('ha-url').value   || '').trim().replace(/\/$/, '');
     var token = ($('ha-token').value || '').trim();
@@ -881,12 +1256,34 @@
 
   $('smarthome-retry').addEventListener('click', function () { loadSmartHome(true); });
 
-  /* ── background poll ────────────────────────────────── */
-  setInterval(function () {
-    if (state.page === 'smarthome' && state.haConnected && state.loaded && !state.sheet.open) {
-      loadSmartHome(false);
-    }
-  }, 20000);
+  function pulseRefreshBtn(id) {
+    var btn = $(id);
+    if (!btn) return;
+    btn.classList.add('is-busy');
+    setTimeout(function () { btn.classList.remove('is-busy'); }, 600);
+  }
+
+  $('smarthome-refresh-btn').addEventListener('click', function () {
+    pulseRefreshBtn('smarthome-refresh-btn');
+    refreshHADevices({ silent: true });
+  });
+
+  /* ── background poll (interval from backend config) ─── */
+  var _haPollTimer = null;
+  function startHAPolling(intervalSec) {
+    if (_haPollTimer) clearInterval(_haPollTimer);
+    if (!intervalSec || intervalSec <= 0) return;
+    _haPollTimer = setInterval(function () {
+      if (!state.haConnected) return;
+      if (state.sheet.open) return;
+      refreshHADevices({ silent: true });
+    }, intervalSec * 1000);
+  }
+
+  xhr('GET', API + '/api/config', null, function (err, cfg) {
+    var sec = (!err && cfg && cfg.haRefreshIntervalSec != null) ? cfg.haRefreshIntervalSec : 15;
+    startHAPolling(sec);
+  });
 
   /* expose openLightSheet for Home module device cards */
   window._openLightSheet = openLightSheet;
@@ -940,11 +1337,44 @@
 
   window._homeSetWidgets = function (widgets) {
     _widgets = Array.isArray(widgets) ? widgets : [];
-    _haEntities = null;
+    if (!_haEntities) _haEntities = [];
     if (window._currentPage === 'home' || !window._currentPage) renderHome();
   };
 
   window._homeRefresh = function () { renderHome(); };
+
+  function getHomeHAWidgets() {
+    var haWidgets = [];
+    for (var i = 0; i < _widgets.length; i++) {
+      if (_widgets[i].type === 'smarthome') haWidgets.push(_widgets[i]);
+    }
+    return haWidgets;
+  }
+
+  window._homeSyncHAEntities = function (entities, summary) {
+    if (!_haGrid || !_haSection) return;
+    var haWidgets = getHomeHAWidgets();
+    if (!haWidgets.length) return;
+
+    if (!_haEntities) _haEntities = [];
+
+    if (!_haGrid.querySelector('.device-card[data-eid]')) {
+      _haEntities = entities.slice();
+      buildHACards(_haGrid, haWidgets, _haEntities);
+      return;
+    }
+
+    if (window._mergeHAEntities) window._mergeHAEntities(_haEntities, entities);
+
+    var map = {};
+    for (var i = 0; i < _haEntities.length; i++) map[_haEntities[i].entity_id] = _haEntities[i];
+    var cards = _haGrid.querySelectorAll('.device-card[data-eid]');
+    for (var c = 0; c < cards.length; c++) {
+      var card = cards[c];
+      var eid = card.getAttribute('data-eid');
+      if (map[eid] && window._syncHACard) window._syncHACard(card, map[eid]);
+    }
+  };
 
   /* ── main render ──────────────────────────────────── */
   function renderHome() {
@@ -1010,13 +1440,12 @@
     if (_haSection && _haGrid) {
       if (haWidgets.length) {
         _haSection.classList.remove('hidden');
-        _haGrid.innerHTML = '';
-        buildHACards(_haGrid, haWidgets, _haEntities || []);
-        if (!_haEntities) {
-          window._xhr('GET', '/api/ha/entities', null, function (err, entities) {
-            if (!err && Array.isArray(entities)) _haEntities = entities;
-            buildHACards(_haGrid, haWidgets, _haEntities || []);
-          });
+        if (!_haEntities || !_haGrid.querySelector('.device-card[data-eid]')) {
+          _haGrid.innerHTML = '';
+          buildHACards(_haGrid, haWidgets, _haEntities || []);
+          if (!_haEntities || !_haEntities.length) {
+            if (window._refreshHADevices) window._refreshHADevices({ silent: true });
+          }
         }
       } else {
         _haSection.classList.add('hidden');
@@ -1061,8 +1490,10 @@
           var iw=make('div','light-main-icon-wrap'); iw.appendChild(ico); lb.appendChild(iw); lb.appendChild(info);
           var rb=make('button','light-detail-open','›'); rb.type='button';
           lb.addEventListener('click', function(ev){ ev.stopPropagation();
-            window._xhr('POST','/api/ha/service',{domain:'light',service:on?'turn_off':'turn_on',service_data:{entity_id:entity.entity_id}},function(err){
-              if(!err){on=!on;entity.state=on?'on':'off';_haEntities=null;card.className='device-card'+(on?' on':'');stateEl.textContent=stateLabel(entity.state);}
+            window._guardDeviceAction(entity.entity_id, function () {
+              window._xhr('POST','/api/ha/service',{domain:'light',service:on?'turn_off':'turn_on',service_data:{entity_id:entity.entity_id}},function(err){
+                if(!err){on=!on;entity.state=on?'on':'off';card.className='device-card'+(on?' on':'');stateEl.textContent=stateLabel(entity.state);}
+              });
             });
           });
           rb.addEventListener('click',function(ev){ ev.stopPropagation(); if(window._openLightSheet)window._openLightSheet(entity); });
@@ -1073,8 +1504,10 @@
             card.addEventListener('click', function(){
               var svc=on?(domain==='cover'?'close_cover':'turn_off'):(domain==='cover'?'open_cover':'turn_on');
               var sd=domain==='cover'?'cover':(domain==='media_player'?'media_player':domain);
-              window._xhr('POST','/api/ha/service',{domain:sd,service:svc,service_data:{entity_id:entity.entity_id}},function(err){
-                if(!err){on=!on;entity.state=on?'on':'off';_haEntities=null;card.className='device-card'+(on?' on':'');stateEl.textContent=stateLabel(entity.state);}
+              window._guardDeviceAction(entity.entity_id, function () {
+                window._xhr('POST','/api/ha/service',{domain:sd,service:svc,service_data:{entity_id:entity.entity_id}},function(err){
+                  if(!err){on=!on;entity.state=on?'on':'off';card.className='device-card'+(on?' on':'');stateEl.textContent=stateLabel(entity.state);}
+                });
               });
             });
           }
@@ -1233,6 +1666,15 @@
 
   /* ── hook: refresh on home tab click ───────────────── */
   /* handled by core module calling window._homeRefresh() */
+
+  var _homeRefreshBtn = $('home-smarthome-refresh-btn');
+  if (_homeRefreshBtn) {
+    _homeRefreshBtn.addEventListener('click', function () {
+      _homeRefreshBtn.classList.add('is-busy');
+      setTimeout(function () { _homeRefreshBtn.classList.remove('is-busy'); }, 600);
+      if (window._refreshHADevices) window._refreshHADevices({ silent: true });
+    });
+  }
 
 })();
 
@@ -3378,6 +3820,140 @@
     applyFeature(FEATURES[ii], true);
   }
 
+})();
+
+/* ════════════════════════════════════════════════════════
+   DEVICE-LOCK MODULE — ES5, iOS 9 safe
+   Settings → "Smart device protection": lists HA entities and
+   lets the user flag individual devices with a lock icon.
+   Locked devices require the DEVICES_PIN (see auth.js) before
+   every interaction, both on the Home tab and the Smart Home
+   tab — enforced by window._isDeviceLocked / _guardDeviceAction
+   in the main module.
+   ════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  function $d(id) { return document.getElementById(id); }
+
+  var ICONS = { light: '○', switch: '⌁', input_boolean: '⌁', media_player: '▷', climate: '◇', fan: '◎', cover: '▭' };
+
+  function domainOf(eid)   { return eid.split('.')[0]; }
+  function friendlyName(e) {
+    return (e.attributes && e.attributes.friendly_name)
+      ? e.attributes.friendly_name
+      : e.entity_id.split('.')[1].replace(/_/g, ' ');
+  }
+
+  /* Locked entity ids — kept in sync with the main module's copy via
+     window._setDeviceLocked, and persisted under 'ha_protected_entities'. */
+  var lockedIds = {};
+
+  function isLocked(eid) { return !!lockedIds[eid]; }
+
+  function save() {
+    var list = [];
+    for (var eid in lockedIds) { if (lockedIds[eid]) list.push(eid); }
+    window._xhr('POST', '/api/settings', { ha_protected_entities: list }, function () {});
+  }
+
+  function lockIconSvg(locked) {
+    return locked
+      /* closed padlock */
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" stroke-width="1.8"/></svg>'
+      /* open padlock */
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  }
+
+  function setRowState(btn, locked) {
+    btn.innerHTML = lockIconSvg(locked);
+    btn.className = 'devlock-lock-btn' + (locked ? ' locked' : '');
+    btn.setAttribute('aria-pressed', locked ? 'true' : 'false');
+  }
+
+  function buildList(entities) {
+    var list = $d('devlock-list');
+    list.innerHTML = '';
+
+    if (!entities.length) {
+      list.innerHTML = '<div class="feat-widget-empty">No devices available.</div>';
+      return;
+    }
+
+    for (var i = 0; i < entities.length; i++) {
+      (function (entity) {
+        var eid = entity.entity_id;
+        var row = document.createElement('div');
+        row.className = 'feat-widget-item';
+
+        var left = document.createElement('div');
+        left.className = 'feat-widget-item-left devlock-item-left';
+        var ic = document.createElement('span');
+        ic.className = 'feat-widget-item-icon';
+        ic.textContent = ICONS[domainOf(eid)] || '◈';
+        var nm = document.createElement('span');
+        nm.className = 'feat-widget-item-name';
+        nm.textContent = friendlyName(entity);
+        left.appendChild(ic);
+        left.appendChild(nm);
+        row.appendChild(left);
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.eid = eid;
+        setRowState(btn, isLocked(eid));
+        btn.addEventListener('click', function () {
+          var next = !isLocked(eid);
+          lockedIds[eid] = next;
+          if (window._setDeviceLocked) window._setDeviceLocked(eid, next);
+          setRowState(btn, next);
+          save();
+        });
+        row.appendChild(btn);
+
+        list.appendChild(row);
+      })(entities[i]);
+    }
+  }
+
+  var loaded = false;
+
+  function populateDeviceLock() {
+    if (loaded) { refreshRowStates(); return; }
+    var loader = $d('devlock-loading');
+    if (loader) loader.classList.remove('hidden');
+
+    window._xhr('GET', '/api/ha/entities', null, function (err, entities) {
+      if (loader) loader.classList.add('hidden');
+      loaded = true;
+      buildList((!err && Array.isArray(entities)) ? entities : []);
+    });
+  }
+
+  /* Re-sync the lock icon of every already-rendered row with the
+     current lockedIds map, without re-fetching the entity list. */
+  function refreshRowStates() {
+    var list = $d('devlock-list');
+    if (!list) return;
+    var rows = list.querySelectorAll('.feat-widget-item');
+    for (var i = 0; i < rows.length; i++) {
+      var btn = rows[i].querySelector('.devlock-lock-btn');
+      var nm  = rows[i].querySelector('.feat-widget-item-name');
+      if (!btn || !nm || !btn.dataset || !btn.dataset.eid) continue;
+      setRowState(btn, isLocked(btn.dataset.eid));
+    }
+  }
+
+  /* Populate as soon as we know which entities are locked, the first
+     time Settings is opened (cheap: a single GET, cached afterwards). */
+  if (window._onSettingsLoad) {
+    window._onSettingsLoad(function (data) {
+      var list = Array.isArray(data.ha_protected_entities) ? data.ha_protected_entities : [];
+      lockedIds = {};
+      for (var i = 0; i < list.length; i++) lockedIds[list[i]] = true;
+      populateDeviceLock();
+    });
+  }
 })();
 
 /* ════════════════════════════════════════════════════════

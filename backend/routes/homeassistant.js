@@ -12,6 +12,7 @@
  * Endpoints:
  *   GET  /api/ha/status               — test connectivity to HA
  *   GET  /api/ha/entities[?domain=]   — list smart-home entities
+ *   GET  /api/ha/devices[?domain=]    — entities + active/total summary (for UI refresh)
  *   GET  /api/ha/entity/:entity_id    — fetch a single entity state
  *   POST /api/ha/service              — call a HA service (e.g. light.turn_on)
  */
@@ -64,6 +65,72 @@ function haHeaders(token) {
   };
 }
 
+/**
+ * True when an entity state counts as "active" in the UI.
+ *
+ * @param {Object} entity
+ * @returns {boolean}
+ */
+function isEntityActive(entity) {
+  var s = entity && entity.state;
+  return s === 'on' || s === 'open' || s === 'playing' || s === 'paused' || s === 'idle';
+}
+
+/**
+ * Build a summary block for the frontend subtitle.
+ *
+ * @param {Array<Object>} entities
+ * @returns {{ total: number, active: number }}
+ */
+function summarizeEntities(entities) {
+  var active = 0;
+  for (var i = 0; i < entities.length; i++) {
+    if (isEntityActive(entities[i])) active++;
+  }
+  return { total: entities.length, active: active };
+}
+
+/**
+ * Filter HA states to the domains exposed in the Smart Home UI.
+ *
+ * @param {Array<Object>} entities
+ * @param {string|null} domain — optional domain filter
+ * @returns {Array<Object>}
+ */
+function filterRelevantEntities(entities, domain) {
+  if (!Array.isArray(entities)) return [];
+
+  if (domain) {
+    return entities.filter(function (e) {
+      return e.entity_id && e.entity_id.startsWith(domain + '.');
+    });
+  }
+
+  return entities.filter(function (e) {
+    var d = e.entity_id.split('.')[0];
+    return RELEVANT_DOMAINS.indexOf(d) !== -1;
+  });
+}
+
+/**
+ * Fetch and filter entity states from Home Assistant.
+ *
+ * @param {Object} config — { url, token }
+ * @param {string|null} domain
+ * @returns {Promise<Array<Object>>}
+ */
+function fetchRelevantEntities(config, domain) {
+  return fetch(config.url + '/api/states', {
+    headers: haHeaders(config.token),
+    timeout: 8000
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (entities) {
+      if (!Array.isArray(entities)) throw new Error('Invalid response from HA');
+      return filterRelevantEntities(entities, domain);
+    });
+}
+
 /* ── Routes ─────────────────────────────────────────────── */
 
 /**
@@ -104,29 +171,41 @@ router.get('/entities', function (req, res) {
   var domain = req.query.domain || null;
   req.log.debug({ domain: domain }, 'fetching HA entities');
 
-  fetch(config.url + '/api/states', { headers: haHeaders(config.token), timeout: 8000 })
-    .then(function (r) { return r.json(); })
+  fetchRelevantEntities(config, domain)
     .then(function (entities) {
-      if (!Array.isArray(entities)) throw new Error('Invalid response from HA');
-
-      /* Filter to a specific domain if requested */
-      if (domain) {
-        entities = entities.filter(function (e) {
-          return e.entity_id && e.entity_id.startsWith(domain + '.');
-        });
-      } else {
-        /* Otherwise restrict to the domains the UI knows how to render */
-        entities = entities.filter(function (e) {
-          var d = e.entity_id.split('.')[0];
-          return RELEVANT_DOMAINS.indexOf(d) !== -1;
-        });
-      }
-
       req.log.info({ count: entities.length }, 'entities returned');
       res.json(entities);
     })
     .catch(function (err) {
       req.log.error({ err: err.message }, 'error fetching HA entities');
+      res.status(500).json({ error: err.message });
+    });
+});
+
+/**
+ * GET /api/ha/devices[?domain=light]
+ * Same entities as /entities plus an active/total summary for the UI.
+ * Used by the frontend refresh loop so counting logic stays server-side.
+ */
+router.get('/devices', function (req, res) {
+  var config = getHAConfig();
+  if (!config.url || !config.token) {
+    return res.status(400).json({ error: 'HA not configured' });
+  }
+
+  var domain = req.query.domain || null;
+  req.log.debug({ domain: domain }, 'fetching HA devices snapshot');
+
+  fetchRelevantEntities(config, domain)
+    .then(function (entities) {
+      req.log.info({ count: entities.length }, 'devices snapshot returned');
+      res.json({
+        entities: entities,
+        summary:  summarizeEntities(entities)
+      });
+    })
+    .catch(function (err) {
+      req.log.error({ err: err.message }, 'error fetching HA devices snapshot');
       res.status(500).json({ error: err.message });
     });
 });

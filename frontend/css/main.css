@@ -1712,6 +1712,9 @@ html, body {
   max-width: 280px; width: 90%;
   text-align: center;
 }
+#pin-overlay .px-confirm-box {
+  max-width: 500px;
+}
 .px-confirm-title { font-size: 17px; font-weight: 500; color: #f0f0ff; margin-bottom: 8px; }
 .px-confirm-msg   { font-size: 14px; color: #c5c5d4; line-height: 1.5; margin-bottom: 20px; }
 .px-confirm-btns  {
@@ -1721,6 +1724,94 @@ html, body {
 .px-confirm-btns .btn-secondary,
 .px-confirm-btns .btn-primary { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; padding: 10px; }
 .px-confirm-btns .btn-primary.danger { background: #8a2020; color: #ffaaaa; }
+
+/* PIN gate — masked dot entry (reused for Settings gate + device lock) */
+.pin-dots-wrap {
+  position: relative;
+  margin-top: 10px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+}
+.pin-dots {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  padding: 10px 0;
+}
+.pin-dots > .pin-dot {
+  width: 13px; height: 13px;
+  margin: 0 6px;
+  border-radius: 50%;
+  border: 1.5px solid #4a4a60;
+  background: transparent;
+  -webkit-box-sizing: border-box; box-sizing: border-box;
+}
+.pin-dots > .pin-dot.filled {
+  background: #6c6cf0;
+  border-color: #6c6cf0;
+}
+/* Custom in-app numeric keypad. We deliberately never invoke the
+   system keyboard for PIN entry: iPad shows a full QWERTY keyboard for
+   type="tel" inputs (only iPhone gets a numeric-only pad there), so a
+   real on-screen numpad is the only way to guarantee number keys on
+   every device. */
+.pin-keypad {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-wrap: wrap; flex-wrap: wrap;
+  margin-top: 6px;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none
+}
+.pin-key {
+  -webkit-box-flex: 0; -webkit-flex: 0 0 33.333%; flex: 0 0 33.333%;
+  -webkit-box-sizing: border-box; box-sizing: border-box;
+  padding: 30px 0;
+  margin: 0;
+  background: none;
+  border: none;
+  border-top: 1px solid #232336;
+  font-size: 28px;
+  font-weight: 400;
+  color: #e8e8f4;
+  -webkit-appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.pin-key:nth-child(3n+1) { border-right: 1px solid #232336; }
+.pin-key:nth-child(3n+2) { border-right: 1px solid #232336; }
+.pin-key:active { background: rgba(255,255,255,0.06); }
+.pin-key-ghost { color: transparent; pointer-events: none; }
+.pin-key-back { font-size: 22px; color: #9090a8; }
+html.light .pin-key { color: #2a2a3a; border-top-color: #e2e2ec; }
+html.light .pin-key:nth-child(3n+1),
+html.light .pin-key:nth-child(3n+2) { border-right-color: #e2e2ec; }
+html.light .pin-key:active { background: rgba(0,0,0,0.05); }
+html.light .pin-key-back { color: #7a7a90; }
+
+.pin-error {
+  color: #ff5f57;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.pin-error.hidden { display: none; }
+html.light .pin-error { color: #c92a2a; }
+html.light .pin-dots > .pin-dot { border-color: #c0c0d0; }
+html.light .pin-dots > .pin-dot.filled { background: #5050d0; border-color: #5050d0; }
+
+/* Device-lock list (Settings → Smart device protection) */
+.devlock-item-left { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-align: center; -webkit-align-items: center; align-items: center; }
+.devlock-lock-btn {
+  border: none; background: transparent;
+  padding: 6px; margin: 0; -webkit-appearance: none;
+  color: #555568; line-height: 0;
+}
+.devlock-lock-btn.locked { color: #f0c14b; }
+html.light .devlock-lock-btn { color: #9090a8; }
+html.light .devlock-lock-btn.locked { color: #c98a0a; }
+
 
 /* ═══════════════════════════════════════════════════════
    HOME SCREEN — Redesign
@@ -1827,11 +1918,41 @@ html, body {
 /* ── Section (Smart Home tiles on home) ─────────────── */
 .home-section { padding: 0 0 4px; }
 .home-section.hidden { display: none; }
+.home-section-header {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  padding: 18px 18px 10px;
+}
 .home-section-label {
   font-size: 11px; font-weight: 500; letter-spacing: 0.12em;
   text-transform: uppercase; color: #44445a;
-  padding: 18px 18px 10px;
+  padding: 0;
 }
+.home-section-header .btn-icon-only {
+  width: 32px; height: 32px; min-width: 32px;
+  border-radius: 8px; border: 1px solid #2a2a3a;
+  background: #14141e; color: #9090b8; font-size: 18px; line-height: 1;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.home-section-header .btn-icon-only:active { opacity: 0.65; }
+.home-section-header .btn-icon-only.is-busy { opacity: 0.45; pointer-events: none; }
+
+/* ── Smart Home tab refresh ───────────────────────── */
+#page-smarthome .page-content { padding-top: 6px; }
+.smarthome-top-actions {
+  margin: 0 14px 8px;
+  display: -webkit-flex; display: -webkit-box; display: flex;
+  -webkit-box-pack: end; -webkit-justify-content: flex-end; justify-content: flex-end;
+}
+.smarthome-top-actions .btn-icon-only {
+  width: 32px; height: 32px; min-width: 32px;
+  border-radius: 8px; border: 1px solid #2a2a3a;
+  background: #14141e; color: #9090b8; font-size: 18px; line-height: 1;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.smarthome-top-actions .btn-icon-only:active { opacity: 0.65; }
+.smarthome-top-actions .btn-icon-only.is-busy { opacity: 0.45; pointer-events: none; }
 
 /* ── Widget grid (reuse existing device cards) ──────── */
 /* device cards in home use the existing .devices-grid + .device-card rules */
@@ -1953,6 +2074,10 @@ html.light .home-empty-desc  { color: #b0b0c0; }
 
 /* Section labels */
 html.light .home-section-label { color: #8080a0; }
+html.light .home-section-header .btn-icon-only,
+html.light .smarthome-top-actions .btn-icon-only {
+  background: #f0f0f6; border-color: #d0d0da; color: #505068;
+}
 html.light .hw-section-label   { color: #8080a0; }
 
 /* Device cards */
@@ -2275,4 +2400,3 @@ html.light .toggle-visibility { color: #8080a0; }
 
 /* Jelly pagination */
 html.light .jelly-pagination { border-top-color: #d0d0da; }
-

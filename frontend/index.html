@@ -87,7 +87,10 @@
 
         <!-- Smart Home quick tiles -->
         <div id="home-smarthome-section" class="home-section hidden">
-          <div class="home-section-label">Smart Home</div>
+          <div class="home-section-header">
+            <div class="home-section-label">Smart Home</div>
+            <button id="home-smarthome-refresh-btn" class="btn-icon-only" title="Refresh devices">↻</button>
+          </div>
           <div id="home-smarthome-grid" class="devices-grid"></div>
         </div>
 
@@ -101,6 +104,9 @@
         <div class="page-subtitle" id="smarthome-subtitle">Devices</div>
       </div>
       <div class="page-content">
+        <div class="smarthome-top-actions">
+          <button id="smarthome-refresh-btn" class="btn-icon-only" title="Refresh devices">↻</button>
+        </div>
         <div id="smarthome-loading" class="loading-state">
           <div class="spinner"></div>
           <div>Retrieving devices...</div>
@@ -511,6 +517,15 @@
 
         </div>
 
+        <div class="settings-block" id="device-lock-block">
+          <div class="settings-block-title">Smart device protection</div>
+          <div class="settings-block-desc">Lock individual smart devices behind the PIN configured via the DEVICES_PIN environment variable. A locked device asks for the PIN before every interaction, from both the Home and Smart Home tabs.</div>
+          <div class="feat-acc-loading" id="devlock-loading">
+            <div class="spinner-sm"></div>
+          </div>
+          <div class="feat-acc-list" id="devlock-list"></div>
+        </div>
+
         <div class="settings-block settings-block-placeholder">
           <div class="settings-block-title">Notifications</div>
           <div class="settings-block-desc settings-placeholder-text">Coming soon</div>
@@ -778,6 +793,42 @@
       <span class="tab-label">Settings</span>
     </button>
   </nav>
+
+  <!-- Generic PIN prompt — reused for the Settings-tab gate AND for
+       interacting with PIN-locked smart devices. The digits are never
+       shown: a row of dots fills in as the user types. Digits come
+       only from the in-app keypad below — no system keyboard is ever
+       invoked, so the numeric pad is guaranteed on every device
+       (iPad's on-screen keyboard for "tel" inputs is NOT numeric-only,
+       unlike iPhone's). -->
+  <div id="pin-overlay" class="px-confirm-overlay hidden">
+    <div class="px-confirm-box">
+      <div class="px-confirm-title" id="pin-title">Settings locked</div>
+      <div class="px-confirm-msg" id="pin-msg">Enter the PIN to access Settings.</div>
+      <div class="pin-dots-wrap" id="pin-dots-wrap">
+        <div class="pin-dots" id="pin-dots"></div>
+      </div>
+      <div id="pin-error" class="pin-error hidden">Wrong PIN</div>
+      <div class="pin-keypad" id="pin-keypad">
+        <button type="button" class="pin-key" data-digit="1">1</button>
+        <button type="button" class="pin-key" data-digit="2">2</button>
+        <button type="button" class="pin-key" data-digit="3">3</button>
+        <button type="button" class="pin-key" data-digit="4">4</button>
+        <button type="button" class="pin-key" data-digit="5">5</button>
+        <button type="button" class="pin-key" data-digit="6">6</button>
+        <button type="button" class="pin-key" data-digit="7">7</button>
+        <button type="button" class="pin-key" data-digit="8">8</button>
+        <button type="button" class="pin-key" data-digit="9">9</button>
+        <button type="button" class="pin-key pin-key-ghost" disabled></button>
+        <button type="button" class="pin-key" data-digit="0">0</button>
+        <button type="button" class="pin-key pin-key-back" id="pin-backspace" aria-label="Backspace">⌫</button>
+      </div>
+      <div class="px-confirm-btns" style="margin-top:14px;">
+        <button id="pin-cancel" class="btn-secondary">Cancel</button>
+        <button id="pin-submit" class="btn-primary">Unlock</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.4/chartist.min.js"></script>
   <script src="js/app.js"></script>

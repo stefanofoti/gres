@@ -7,8 +7,11 @@
  *   - Logs every request/response with a unique requestId via Pino
  *
  * Environment variables (see .env):
- *   PORT      — TCP port to listen on (default: 3000)
- *   LOG_LEVEL — Pino log level: trace|debug|info|warn|error (default: info)
+ *   PORT                    — TCP port to listen on (default: 3000)
+ *   LOG_LEVEL               — Pino log level: trace|debug|info|warn|error (default: info)
+ *   HA_REFRESH_INTERVAL_SEC — Smart Home auto-refresh interval in seconds (default: 15, 0 = off)
+ *   SETTINGS_PIN            — Numeric PIN protecting the Settings tab (unset = no protection)
+ *   DEVICES_PIN             — Numeric PIN protecting locked smart devices (unset = no protection)
  */
 
 'use strict';
@@ -59,6 +62,12 @@ app.use('/api/markets', require('./routes/markets'));
 
 /* Settings — persistent key/value store (JSON file) */
 app.use('/api/settings', require('./routes/settings'));
+
+/* Runtime config — read-only env-backed values for the frontend */
+app.use('/api/config', require('./routes/config'));
+
+/* Auth — numeric PIN gate for the Settings tab */
+app.use('/api/auth', require('./routes/auth'));
 
 /* ── SPA fallback ───────────────────────────────────────
    Any non-API path returns index.html so that the
