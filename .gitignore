@@ -5,3 +5,5 @@ data/
 .DS_Store
 .dev/
 *.zip
+test-results/
+playwright-report/

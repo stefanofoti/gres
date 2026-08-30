@@ -2188,7 +2188,7 @@ if (pinReady) {
         row.appendChild(nameEl);
 
         var summaryWrap = document.createElement('div');
-        summaryWrap.style.cssText = '-webkit-box-flex:1;-webkit-flex:1;flex:1;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;gap:4px;';
+        summaryWrap.style.cssText = '-webkit-box-flex:1;-webkit-flex:1;flex:1;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;';
         var summaryEl = document.createElement('div');
         summaryEl.className = 'weather-day-summary';
         summaryEl.textContent = weatherCodeLabel(d.weatherCode);
@@ -2452,6 +2452,14 @@ if (pinReady) {
     $j('jelly-subtitle').textContent = total + ' ' + label;
   }
 
+  /* mirrors the .jelly-card column-count breakpoints in css/main.css */
+  function jellyColumns() {
+    var w = window.innerWidth;
+    if (w >= 900) return 8;
+    if (w >= 600) return 6;
+    return 5;
+  }
+
   /* ── render grid ────────────────────────────────────── */
   function renderGrid(items, type) {
     var grid = $j('jelly-grid');
@@ -2485,7 +2493,7 @@ if (pinReady) {
       img.alt = item.Name || '';
       // lazy: set src after append
       var dpr = window.devicePixelRatio || 1;
-        var cardW = Math.round((window.innerWidth - 32) / 5);
+        var cardW = Math.round((window.innerWidth - 32) / jellyColumns());
         var targetH = Math.round(cardW * 1.5 * dpr);
         img.src = '/api/jf/image/' + item.Id + '?type=Primary&maxH=' + targetH;
       img.onerror = function () {
@@ -2702,6 +2710,20 @@ if (pinReady) {
   window._onSettingsLoad(function (data) {
     if (data.jf_url)   $j('jf-url').value   = data.jf_url;
     if (data.jf_token) $j('jf-token').value = data.jf_token;
+  });
+
+  /* Re-fetch on rotation only if the column bracket actually changed and the
+     Jellyfin tab has already loaded — a plain resize is not enough since iOS
+     also fires resize for the software keyboard opening/closing. */
+  var _lastJellyCols = jellyColumns();
+  window.addEventListener('orientationchange', function () {
+    setTimeout(function () {
+      var cols = jellyColumns();
+      if (cols !== _lastJellyCols) {
+        _lastJellyCols = cols;
+        if (jf.userId && window._currentPage === 'jelly') loadJelly(false);
+      }
+    }, 200); /* iOS fires orientationchange before the new viewport size settles */
   });
 
 })();
@@ -3958,14 +3980,15 @@ if (pinReady) {
 
 /* ════════════════════════════════════════════════════════
    APPEARANCE MODULE — ES5, iOS 9 safe
-   Manages: light/dark theme + status bar visibility.
+   Manages: light/dark theme + status bar visibility + text size.
    Persists to localStorage (supported on iOS 9+ Safari).
    ════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
 
-  var LS_THEME  = 'gres_theme';      /* 'light' | 'dark' */
-  var LS_SBAR   = 'gres_statusbar';  /* 'hidden' | 'visible' */
+  var LS_THEME    = 'gres_theme';      /* 'light' | 'dark' */
+  var LS_SBAR     = 'gres_statusbar';  /* 'hidden' | 'visible' */
+  var LS_FONTSIZE = 'gres_fontsize';   /* 'normal' | 'large' | 'xl' */
 
   /* ── safe localStorage helpers (iOS 9 private mode may throw) ── */
   function lsGet(key) {
@@ -3983,6 +4006,7 @@ if (pinReady) {
 
   var themeToggle  = document.getElementById('toggle-light-theme');
   var sbarToggle   = document.getElementById('toggle-status-bar');
+  var fsButtons    = document.querySelectorAll('#fs-btn-row .fs-btn');
 
   /* ── Apply theme ─────────────────────────────────── */
   function applyTheme(isLight) {
@@ -4021,16 +4045,32 @@ if (pinReady) {
     }
   }
 
-  /* ── Init from localStorage ──────────────────────── */
-  var savedTheme = lsGet(LS_THEME);
-  var savedSbar  = lsGet(LS_SBAR);
+  /* ── Apply text size ─────────────────────────────── */
+  function applyFontSize(size) {
+    htmlEl.className = (htmlEl.className || '').replace(/\bfs-large\b|\bfs-xl\b/g, '');
+    if (size === 'large') htmlEl.className += ' fs-large';
+    else if (size === 'xl') htmlEl.className += ' fs-xl';
+    /* sync button group */
+    for (var i = 0; i < fsButtons.length; i++) {
+      var btn = fsButtons[i];
+      if (btn.getAttribute('data-fontsize') === size) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  }
 
-  /* Default: dark theme, status bar visible */
+  /* ── Init from localStorage ──────────────────────── */
+  var savedTheme    = lsGet(LS_THEME);
+  var savedSbar     = lsGet(LS_SBAR);
+  var savedFontSize = lsGet(LS_FONTSIZE);
+
+  /* Default: dark theme, status bar visible, normal text size */
   var isLight   = (savedTheme === 'light');
   var sbarVisible = (savedSbar !== 'hidden'); /* default visible */
+  var fontSize = (savedFontSize === 'large' || savedFontSize === 'xl') ? savedFontSize : 'normal';
 
   applyTheme(isLight);
   applyStatusBar(sbarVisible);
+  applyFontSize(fontSize);
 
   /* ── Toggle handlers ─────────────────────────────── */
   if (themeToggle) {
@@ -4047,6 +4087,17 @@ if (pinReady) {
       applyStatusBar(sbarVisible);
       lsSet(LS_SBAR, sbarVisible ? 'visible' : 'hidden');
     });
+  }
+
+  for (var fi = 0; fi < fsButtons.length; fi++) {
+    (function (btn) {
+      btn.addEventListener('click', function () {
+        var size = btn.getAttribute('data-fontsize');
+        fontSize = size;
+        applyFontSize(fontSize);
+        lsSet(LS_FONTSIZE, fontSize);
+      });
+    })(fsButtons[fi]);
   }
 
 })();
