@@ -1,0 +1,104 @@
+[
+  {
+    "file": "auth_pin-status_scope_devices.json",
+    "path": "/api/auth/pin-status",
+    "search": "?scope=devices",
+    "status": 200
+  },
+  {
+    "file": "auth_pin-status_scope_settings.json",
+    "path": "/api/auth/pin-status",
+    "search": "?scope=settings",
+    "status": 200
+  },
+  {
+    "file": "auth_verify-pin.json",
+    "path": "/api/auth/verify-pin",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "config.json",
+    "path": "/api/config",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "ha_devices.json",
+    "path": "/api/ha/devices",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "ha_entities.json",
+    "path": "/api/ha/entities",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "ha_status.json",
+    "path": "/api/ha/status",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "jf_items_userId_00000000000000000000000000000001_type_Movie_page_0_pageSize_24_sortBy_SortName_sortOrder_Ascending.json",
+    "path": "/api/jf/items",
+    "search": "?userId=00000000000000000000000000000001&type=Movie&page=0&pageSize=24&sortBy=SortName&sortOrder=Ascending",
+    "status": 200
+  },
+  {
+    "file": "jf_userid.json",
+    "path": "/api/jf/userid",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "markets_favorites.json",
+    "path": "/api/markets/favorites",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "px_nodes.json",
+    "path": "/api/px/nodes",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "px_nodes_proxmox_rrd_timeframe_hour.json",
+    "path": "/api/px/nodes/proxmox/rrd",
+    "search": "?timeframe=hour",
+    "status": 200
+  },
+  {
+    "file": "px_nodes_proxmox_status.json",
+    "path": "/api/px/nodes/proxmox/status",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "px_nodes_proxmox_storage.json",
+    "path": "/api/px/nodes/proxmox/storage",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "px_nodes_proxmox_vms.json",
+    "path": "/api/px/nodes/proxmox/vms",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "settings.json",
+    "path": "/api/settings",
+    "search": "",
+    "status": 200
+  },
+  {
+    "file": "weather_forecast_lat_45.46427_lon_9.18951_timezone_Europe_2FRome.json",
+    "path": "/api/weather/forecast",
+    "search": "?lat=45.46427&lon=9.18951&timezone=Europe%2FRome",
+    "status": 200
+  }
+]

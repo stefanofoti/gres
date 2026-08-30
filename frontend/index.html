@@ -168,14 +168,14 @@
               <div class="weather-day-label">Today</div>
               <div class="weather-day-temp"><span id="weather-today-max">--°</span><small id="weather-today-min">--°</small></div>
               <div class="weather-day-desc" id="weather-today-desc">—</div>
-              <div class="weather-day-precip" id="weather-today-precip" style="display:none;margin-top:5px;font-size:10px;color:#7a7aaa;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;gap:3px;"></div>
+              <div class="weather-day-precip" id="weather-today-precip" style="display:none;margin-top:5px;font-size:10px;"></div>
             </div>
             <div class="weather-day-card">
               <div class="weather-day-card-icon" id="weather-tomorrow-icon"></div>
               <div class="weather-day-label">Tomorrow</div>
               <div class="weather-day-temp"><span id="weather-tomorrow-max">--°</span><small id="weather-tomorrow-min">--°</small></div>
               <div class="weather-day-desc" id="weather-tomorrow-desc">—</div>
-              <div class="weather-day-precip" id="weather-tomorrow-precip" style="display:none;margin-top:5px;font-size:10px;color:#7a7aaa;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;gap:3px;"></div>
+              <div class="weather-day-precip" id="weather-tomorrow-precip" style="display:none;margin-top:5px;font-size:10px;"></div>
             </div>
           </div>
 
@@ -405,6 +405,24 @@
             </div>
             <div class="power-toggle" id="toggle-status-bar">
               <div class="power-knob"></div>
+            </div>
+          </div>
+
+          <!-- Text size -->
+          <div class="appearance-row">
+            <div class="appearance-row-left">
+              <div class="appearance-row-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 17L8.5 6h1L14 17M5.4 13.5h7.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M16 17l3-7.5 3 7.5M17 14.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="appearance-row-label">Text size</div>
+            </div>
+            <div class="fs-btn-row" id="fs-btn-row">
+              <button type="button" class="fs-btn active" data-fontsize="normal">A</button>
+              <button type="button" class="fs-btn" data-fontsize="large">A+</button>
+              <button type="button" class="fs-btn" data-fontsize="xl">A++</button>
             </div>
           </div>
 

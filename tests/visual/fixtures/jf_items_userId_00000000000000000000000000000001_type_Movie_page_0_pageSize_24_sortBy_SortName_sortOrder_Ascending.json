@@ -1,0 +1,1210 @@
+{
+  "items": [
+    {
+      "Name": "28 anni dopo",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "8341af8b96a6e829d1c53bd389a2a054",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2025-06-18T00:00:00.0000000Z",
+      "CriticRating": 88,
+      "OfficialRating": "IT-14+",
+      "ChannelId": null,
+      "Overview": "Sono passati quasi tre decenni da quando il virus della rabbia è fuoriuscito da un laboratorio di armi biologiche e ora, ancora in una quarantena forzata e brutale, alcuni sono riusciti a sopravvivere in mezzo agli infetti. Un gruppo di sopravvissuti vive su una piccola isola collegata alla terraferma da un'unica strada rialzata ed estremamente protetta. Quando uno di questi  lascia l'isola per una missione diretta nel profondo della terraferma, scoprirà segreti, meraviglie e orrori che hanno mutato non solo gli infetti ma anche gli altri sopravvissuti.",
+      "Genres": [
+        "Horror",
+        "Thriller",
+        "Fantascienza"
+      ],
+      "CommunityRating": 6.96,
+      "RunTimeTicks": 69060480000,
+      "ProductionYear": 2025,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Horror",
+          "Id": "8b9bd9a3eddad02f2b759b4938fdd0b8"
+        },
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        },
+        {
+          "Name": "Fantascienza",
+          "Id": "4fd901f85aa76631af5dd4e5ef15b169"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "8341af8b-96a6-e829-d1c5-3bd389a2a054",
+        "ItemId": "8341af8b96a6e829d1c53bd389a2a054"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "eec2aea6d063cc2b68fccd36a397cec8"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "eec2aea6d063cc2b68fccd36a397cec8": "deP?j#yC.8~WtlMxs:.8.8t7RPWC=|x]R*IAx]aKRPkW"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "50 km all'ora",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "0835b27529bfc51c88a69fdabd4c89bf",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2024-01-04T00:00:00.0000000Z",
+      "ChannelId": null,
+      "Overview": "Due fratelli si ritrovano dopo tanti anni al funerale del padre e tra rancori passati e affetto sopito, affrontano un viaggio a bordo di due moto scassate, costruite quando erano due ragazzini.",
+      "Genres": [
+        "Commedia"
+      ],
+      "CommunityRating": 6.8,
+      "RunTimeTicks": 67095040000,
+      "ProductionYear": 2024,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Commedia",
+          "Id": "f924dc9db9119d5ba1aecee1223634e1"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "0835b275-29bf-c51c-88a6-9fdabd4c89bf",
+        "ItemId": "0835b27529bfc51c88a69fdabd4c89bf"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "a1e7ff610f654746f03abcee829aefc2"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "a1e7ff610f654746f03abcee829aefc2": "dLGR^{^*e@t8KnnOS6WF9*D*EkkXIBV[S7R.${%MxbkD"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "1917",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "97ea56a693456c13a3f4325f6bcd8be5",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2019-12-25T00:00:00.0000000Z",
+      "CriticRating": 88,
+      "OfficialRating": "R",
+      "ChannelId": null,
+      "Overview": "Al culmine della prima guerra mondiale, due giovani soldati britannici, Schofield e Blake ricevono una missione apparentemente impossibile. In una corsa contro il tempo, devono attraversare il territorio nemico e consegnare un messaggio che arresterà un attacco mortale contro centinaia di soldati, tra cui il fratello di Blake.",
+      "Genres": [
+        "Guerra",
+        "Storia",
+        "Thriller",
+        "Dramma"
+      ],
+      "CommunityRating": 8,
+      "RunTimeTicks": 71593600000,
+      "ProductionYear": 2019,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Guerra",
+          "Id": "b8097941dbc32a075bc720ea2bf9c039"
+        },
+        {
+          "Name": "Storia",
+          "Id": "2d82c43c3c342ff49807bb73add8e463"
+        },
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        },
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2026-03-07T08:01:20.8798527Z",
+        "Played": false,
+        "Key": "530915",
+        "ItemId": "97ea56a693456c13a3f4325f6bcd8be5"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "6982280a75472041422a3999b2b8da39"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "6982280a75472041422a3999b2b8da39": "dWDvyQxukWt6_Ns:WBoeWZozRPogNIozjFkDo}t7s:kC"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "2041 - Restore Point",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "c9d9f3b2102143b5e9999ce3b346e191",
+      "Container": "mkv",
+      "PremiereDate": "2023-09-21T00:00:00.0000000Z",
+      "CriticRating": 95,
+      "ChannelId": null,
+      "Overview": "Siamo nel 2041 e i divari nella disuguaglianza sociale ed economica hanno lasciato il mondo sull’orlo del baratro. Una svolta scientifica ha dato all’umanità la capacità di riportare in vita le vittime di un crimine violento effettuando il backup del loro cervello ogni 2 giorni. Ciò offre a un giovane e ambizioso detective l'opportunità di risolvere il caso di una coppia assassinata quando la squadra di restauro è in grado di riportarne indietro uno.",
+      "Genres": [
+        "Fantascienza",
+        "Crime",
+        "Thriller"
+      ],
+      "CommunityRating": 5.965,
+      "RunTimeTicks": 68339840000,
+      "ProductionYear": 2023,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Fantascienza",
+          "Id": "4fd901f85aa76631af5dd4e5ef15b169"
+        },
+        {
+          "Name": "Crime",
+          "Id": "83a9dab21914792744c8fb23b9925dc6"
+        },
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2025-05-18T19:45:53.0747691Z",
+        "Played": true,
+        "Key": "1071815",
+        "ItemId": "c9d9f3b2102143b5e9999ce3b346e191"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "8b1f34650ff3cc23a0520b5fc4d39f9b"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "8b1f34650ff3cc23a0520b5fc4d39f9b": "dOCGAS#kE3x^=}xZSixv8^o~%Lr?I.og$#RPT0emxEX7"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Agata Christian - Delitto sulle nevi",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "879b86a0d3181f2eedf5d57c47313d5c",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2026-02-04T23:00:00.0000000Z",
+      "ChannelId": null,
+      "Overview": "Christian Agata, celebre criminologo dal sarcasmo affilato e dall'intuito infallibile, viene invitato da Cullman, magnati dei giochi da tavolo, a trascorrere un fine settimana sulla neve nella loro lussuosa residenza in montagna. Lo scopo? Prestare volto e fama al rilancio di Crime Castle, il celebre gioco che ha reso la famiglia famosa in tutto il mondo. Ma quella che doveva essere una tranquilla operazione promozionale da trasformare presto in un vero caso da risolvere. Quando Carlo Cullman, patriarca della famiglia, annuncia di voler bloccare la cessione dell'azienda a una start-up aggressiva, i nervi saltano. La mattina dopo l'uomo viene ritrovato senza vita, col corpo riverso sul tabellone del gioco. Poi, come in ogni giallo che si rispetti, una valanga isola la villa dal resto del mondo: niente telefoni, nessuna via di fuga, e un assassino ancora in circolazione.",
+      "Genres": [
+        "Commedia",
+        "Mistero"
+      ],
+      "CommunityRating": 4.897,
+      "RunTimeTicks": 62920000000,
+      "ProductionYear": 2026,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Commedia",
+          "Id": "f924dc9db9119d5ba1aecee1223634e1"
+        },
+        {
+          "Name": "Mistero",
+          "Id": "f41a0e2ccda1a61676e91cbe139f7c04"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 3,
+        "IsFavorite": false,
+        "LastPlayedDate": "2026-06-28T13:41:06.1833205Z",
+        "Played": true,
+        "Key": "1449709",
+        "ItemId": "879b86a0d3181f2eedf5d57c47313d5c"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "86895e6c30d5c3cb1617b068f1f93627"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "86895e6c30d5c3cb1617b068f1f93627": "dBCro@-T9G={~Cafw@={M|ja=_xY}=-n$xM{ESogRPIn"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Air - La storia del grande salto",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "74d3885714caf6d73d34cd134ebab3ad",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2023-04-05T00:00:00.0000000Z",
+      "CriticRating": 93,
+      "OfficialRating": "IT-6+",
+      "ChannelId": null,
+      "Overview": "Sonny Vaccaro, organizzatore di tornei di pallacanestro di provincia e personaggio apparentemente senza arte né parte, viene assunto negli anni '70 dalla Nike per convincere giocatori e allenatori a diventare rappresentanti del giovane marchio sportivo. Vaccaro sarà l'unica persona in grado di convincere un giovanissimo Michael Jordan a firmare per la Nike, cambiando per sempre la storia dello sport, del marketing e dell'abbigliamento sportivo.",
+      "Genres": [
+        "Dramma",
+        "Storia"
+      ],
+      "CommunityRating": 7.3,
+      "RunTimeTicks": 68502080000,
+      "ProductionYear": 2023,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        },
+        {
+          "Name": "Storia",
+          "Id": "2d82c43c3c342ff49807bb73add8e463"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2025-11-01T20:21:57.0920886Z",
+        "Played": false,
+        "Key": "964980",
+        "ItemId": "74d3885714caf6d73d34cd134ebab3ad"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "689687a0f25d9bb2bfc7cb6f87c3c28d"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "689687a0f25d9bb2bfc7cb6f87c3c28d": "dML:_%9Z9a%L0KR+MdjE=}_3%MxD?bD%V@kCt,nO-pbc"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Amami se hai coraggio",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "64646833a7371f08a3b86e27f245acdf",
+      "Container": "mkv",
+      "PremiereDate": "2003-09-17T00:00:00.0000000Z",
+      "CriticRating": 45,
+      "ChannelId": null,
+      "Overview": "Julien e Sophie hanno otto anni, ma sono diversi dai loro coetanei. I due bambini inventano un gioco che consiste nel lanciarsi sfide che implicano azioni sempre più audaci e coraggiose. Una scatola musicale è il simbolo delle loro scommesse. Una volta cresciuti si ritrovano talmente coinvolti da non riuscire più a uscirne mentre l'amicizia si trasforma in passione divorante.",
+      "Genres": [
+        "Dramma",
+        "Commedia",
+        "Romance"
+      ],
+      "CommunityRating": 7.2,
+      "RunTimeTicks": 54190430000,
+      "ProductionYear": 2003,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        },
+        {
+          "Name": "Commedia",
+          "Id": "f924dc9db9119d5ba1aecee1223634e1"
+        },
+        {
+          "Name": "Romance",
+          "Id": "1ffc72e19987e5fa4047c6a6870646cf"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "64646833-a737-1f08-a3b8-6e27f245acdf",
+        "ItemId": "64646833a7371f08a3b86e27f245acdf"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "767bb3ce1c61b0d9e91d8963f43c431a"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "767bb3ce1c61b0d9e91d8963f43c431a": "dbF}?9cbyExwE1Ivx]Rn?GRSbDahxaWaxZWUS0M|s.jZ"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Amici comuni",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "42aab2835db3e2b1f1faf4886b00b257",
+      "Container": "mkv",
+      "PremiereDate": "2026-02-12T23:00:00.0000000Z",
+      "ChannelId": null,
+      "Overview": "Il tema della fragilità dei legami e delle dinamiche familiari contemporanee fa da filo conduttore tra le vicende parallele di due coppie, tra equilibri instabili e nuovi inizi.",
+      "Genres": [
+        "Dramma",
+        "Commedia"
+      ],
+      "CommunityRating": 6,
+      "RunTimeTicks": 55604480000,
+      "ProductionYear": 2026,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        },
+        {
+          "Name": "Commedia",
+          "Id": "f924dc9db9119d5ba1aecee1223634e1"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2026-03-01T13:14:14.9720247Z",
+        "Played": true,
+        "Key": "1575557",
+        "ItemId": "42aab2835db3e2b1f1faf4886b00b257"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "ed298287227be174ce8dfa0ecb9ebb93"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "ed298287227be174ce8dfa0ecb9ebb93": "doK-5k%1-o%1s.ays:j[xtfkj]oftRj]axay~Vt6Ioof"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Angeli e demoni",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "50027cce688105859f8590267a2ad9cc",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2009-04-23T00:00:00.0000000Z",
+      "CriticRating": 36,
+      "OfficialRating": "IT-T",
+      "ChannelId": null,
+      "Overview": "Roma e il mondo sono in lutto per la morte del Santo Padre. Distrutto l'anello piscatorio, il camerlengo deve fare fronte al rapimento dei quattro cardinali favoriti alla successione pontificia e alla minaccia della distruzione della Città del Vaticano ad opera degli Illuminati, una confraternita venuta dal passato a rivendicare il primato della scienza sulla Chiesa e sullo Spirito. Riunito in Concistoro per eleggere il nuovo Papa, il collegio cardinalizio assolda Robert Langdon, docente di simbologia religiosa a Harvard. Nemico stimato della Chiesa, che non gli perdona la negazione dell'incarnazione del Verbo, il cavaliere accademico accetta l'investitura e parte alla volta della Capitale. Archiviati acredine e risentimento, il professore e gli uomini della Chiesa, armati di spirito e alabarda, collaboreranno alle indagini e alla risoluzione del mistero. Un mistero nascosto dentro le chiese e sotto le segrete della Città Eterna.",
+      "Genres": [
+        "Thriller",
+        "Mistero"
+      ],
+      "CommunityRating": 6.716,
+      "RunTimeTicks": 87762720000,
+      "ProductionYear": 2009,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        },
+        {
+          "Name": "Mistero",
+          "Id": "f41a0e2ccda1a61676e91cbe139f7c04"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 2,
+        "IsFavorite": false,
+        "LastPlayedDate": "2025-05-17T12:24:02.5647662Z",
+        "Played": true,
+        "Key": "13448",
+        "ItemId": "50027cce688105859f8590267a2ad9cc"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "84d914842a7b247b6cb28145e9a3e159"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "84d914842a7b247b6cb28145e9a3e159": "dPAudL$inO$g}X$Nrs$g,?$iw^w^WX$i$iw^Ipwd$%sm"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Anonymous",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "49392a8a6dcc5294535606211d30da3f",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2011-10-21T00:00:00.0000000Z",
+      "CriticRating": 47,
+      "OfficialRating": "IT-T",
+      "ChannelId": null,
+      "Overview": "Il film è ambientato durante i disordini politici dell'Inghilterra elisabettiana e affronta una questione che per secoli ha affascinato studiosi e brillanti intellettuali come Mark Twain, Charles Dickens, e Sigmund Freud, ossia: chi ha realmente scritto le opere attribuite a William Shakespeare? Gli esperti hanno dibattuto, vari libri sono stati scritti e molti studiosi hanno dedicato la loro vita per proteggere o sfatare teorie che circondano la paternità delle opere più famose della letteratura inglese. Anonymous offre una possibile risposta, concentrandosi su un momento in cui gli scandalosi intrighi politici e le illecite storie d'amore alla Corte Reale vengono portati alla luce nel luogo più inaspettato: il teatro di Londra.Edward de Vere, conte di Oxford, era un poeta e un drammaturgo affermato alla corte della regina Elisabetta nel XVI secolo. Alcune teorie letterarie del XX secolo ritengono che sia lui in realtà l'autore dei lavori attribuiti a Shakespeare.",
+      "Genres": [
+        "Dramma",
+        "Storia",
+        "Thriller"
+      ],
+      "CommunityRating": 6.4,
+      "RunTimeTicks": 77977950000,
+      "ProductionYear": 2011,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        },
+        {
+          "Name": "Storia",
+          "Id": "2d82c43c3c342ff49807bb73add8e463"
+        },
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "49392a8a-6dcc-5294-5356-06211d30da3f",
+        "ItemId": "49392a8a6dcc5294535606211d30da3f"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "6bedb4c0280bd47d4bab26449c597c10"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "6bedb4c0280bd47d4bab26449c597c10": "dxIY2+%M?b-;~qofWBof-;ofM{ofxuRjWBWBt7ayaxWB"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "The Antisocial Network: la macchina della disinformazione",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "09a057c6d5d806fdacca450f8e9c0ced",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2024-03-10T00:00:00.0000000Z",
+      "CriticRating": 94,
+      "OfficialRating": "R",
+      "ChannelId": null,
+      "Overview": "Dal rickroll alle teorie complottiste virali, scopri come un anonimo sito web è diventato il fulcro di un caos concreto in questo documentario.",
+      "Genres": [
+        "Documentario"
+      ],
+      "CommunityRating": 6.3,
+      "RunTimeTicks": 51061440000,
+      "ProductionYear": 2024,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Documentario",
+          "Id": "e6c32f0a022601eff6d3962a958bed24"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "09a057c6-d5d8-06fd-acca-450f8e9c0ced",
+        "ItemId": "09a057c6d5d806fdacca450f8e9c0ced"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "a7aee3a10dac812142291b0bef45f461"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "a7aee3a10dac812142291b0bef45f461": "dOCG78xaIV%2rqn$WWjbE1oLt6RjS$kDs.WB01NGt7Rj"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Apocalisse Z: l'inizio della fine",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "8366faa4c34a84dd7b484b0a8fc8508a",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2024-10-04T00:00:00.0000000Z",
+      "ChannelId": null,
+      "Overview": "Quando una specie di rabbia che trasforma le persone in creature aggressive si diffonde in tutto il pianeta, Manel si isola in casa con il suo gatto, affidandosi al suo ingegno per sopravvivere; ma presto dovranno uscire in cerca di cibo, per terra e per mare, schivando molti pericoli.",
+      "Genres": [
+        "Dramma",
+        "Azione",
+        "Horror"
+      ],
+      "CommunityRating": 6.815,
+      "RunTimeTicks": 70814400000,
+      "ProductionYear": 2024,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        },
+        {
+          "Name": "Azione",
+          "Id": "d64acbbd8ee236556105ba4b02030a4d"
+        },
+        {
+          "Name": "Horror",
+          "Id": "8b9bd9a3eddad02f2b759b4938fdd0b8"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "8366faa4-c34a-84dd-7b48-4b0a8fc8508a",
+        "ItemId": "8366faa4c34a84dd7b484b0a8fc8508a"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "ad8d5bad9f3484a6d67854d096b443ca"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "ad8d5bad9f3484a6d67854d096b443ca": "ddEMREM|WBxu~pM|NGkB.7WBNGWB-:bHRkaz%LR*RjWB"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "The Apprentice - Alle origini di Trump",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "1ad4100a0a3330f6477c4893b51dfe92",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2024-10-09T00:00:00.0000000Z",
+      "CriticRating": 83,
+      "OfficialRating": "R",
+      "ChannelId": null,
+      "Overview": "New York, anni '70. Determinato a uscire dall'ombra del potente padre e a farsi un nome nel settore immobiliare di Manhattan, l’aspirante magnate Donald J. Trump agli inizi della sua carriera incontra l'uomo che diventerà una delle figure più importanti della sua vita: il faccendiere Roy Cohn. Vedendo del potenziale in Trump, il controverso avvocato — che aveva ottenuto le condanne per spionaggio contro Julius ed Ethel Rosenberg e aveva investigato sui sospetti comunisti insieme al senatore McCarthy — insegna al suo nuovo allievo come accumulare ricchezza e potere con l'inganno, l'intimidazione e la manipolazione mediatica.  Il resto è storia.",
+      "Genres": [
+        "Storia",
+        "Dramma"
+      ],
+      "CommunityRating": 6.9,
+      "RunTimeTicks": 73615210000,
+      "ProductionYear": 2024,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Storia",
+          "Id": "2d82c43c3c342ff49807bb73add8e463"
+        },
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "1ad4100a-0a33-30f6-477c-4893b51dfe92",
+        "ItemId": "1ad4100a0a3330f6477c4893b51dfe92"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "4bb36b2a3671079741e7ec95d4be96da"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "4bb36b2a3671079741e7ec95d4be96da": "dbFhx1NG%L%L~WNHt7t7tRofNGRkaet6NGRjNKWXaxf5"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Argylle - La super spia",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "9af7ced1ea1aea17c6bca78b6d7dec01",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2024-01-31T00:00:00.0000000Z",
+      "CriticRating": 33,
+      "OfficialRating": "IT-6+",
+      "ChannelId": null,
+      "Overview": "Elly Conway è un'autrice solitaria di una serie di romanzi best-seller di spionaggio, la cui idea di felicità è una serata a casa al computer con il suo gatto Alfie. Ma quando le trame dei libri di Elly, incentrate sull'agente segreto Argylle e sulla sua missione di smascherare un'organizzazione criminale globale, iniziano a rispecchiare le azioni segrete di un'organizzazione di spionaggio reale, le tranquille serate a casa diventano un lontano ricordo.",
+      "Genres": [
+        "Azione",
+        "Avventura",
+        "Commedia",
+        "Thriller"
+      ],
+      "CommunityRating": 6.036,
+      "RunTimeTicks": 83408750000,
+      "ProductionYear": 2024,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Azione",
+          "Id": "d64acbbd8ee236556105ba4b02030a4d"
+        },
+        {
+          "Name": "Avventura",
+          "Id": "3c70cff26174a30d6670a4e2fb52e437"
+        },
+        {
+          "Name": "Commedia",
+          "Id": "f924dc9db9119d5ba1aecee1223634e1"
+        },
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2026-03-28T21:02:53.6693726Z",
+        "Played": true,
+        "Key": "848538",
+        "ItemId": "9af7ced1ea1aea17c6bca78b6d7dec01"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "735c0d3ad689fe5c7d0ae67ddc8b0182"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "735c0d3ad689fe5c7d0ae67ddc8b0182": "d68W]x^k0hOu?Is;M_t70JI.xSaJ0oI;%MV?R}oNj^ob"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Assassinio a Venezia",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "12537c212ab8d8f154743d348afe949d",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2023-09-13T00:00:00.0000000Z",
+      "CriticRating": 75,
+      "OfficialRating": "IT-6+",
+      "ChannelId": null,
+      "Overview": "Ora in pensione, ritiratosi in un esilio auto-imposto nella città più glamour del mondo, Poirot partecipa controvoglia a una seduta in un palazzo decadente e infestato. Quando uno degli ospiti viene ucciso, il detective si ritrova in un mondo di ombre e segreti.",
+      "Genres": [
+        "Mistero",
+        "Thriller",
+        "Crime"
+      ],
+      "CommunityRating": 6.613,
+      "RunTimeTicks": 62028800000,
+      "ProductionYear": 2023,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Mistero",
+          "Id": "f41a0e2ccda1a61676e91cbe139f7c04"
+        },
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        },
+        {
+          "Name": "Crime",
+          "Id": "83a9dab21914792744c8fb23b9925dc6"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 8,
+        "IsFavorite": false,
+        "LastPlayedDate": "2026-05-31T19:33:27.9543719Z",
+        "Played": false,
+        "Key": "12537c21-2ab8-d8f1-5474-3d348afe949d",
+        "ItemId": "12537c212ab8d8f154743d348afe949d"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "3bb3fbeafb23ce096225897343e8f055"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "3bb3fbeafb23ce096225897343e8f055": "d67w,I8^9$?Is@xvnfD$4,%OnMozNENGa$%NE2s;x]D*"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Attack_On_Titan_Final_Season_E01",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "1a9ae1231a82004fb6395984852e7a2d",
+      "Container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "ChannelId": null,
+      "Genres": [],
+      "RunTimeTicks": 36551459410,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2025-01-11T21:44:22.6992151Z",
+        "Played": false,
+        "Key": "1a9ae123-1a82-004f-b639-5984852e7a2d",
+        "ItemId": "1a9ae1231a82004fb6395984852e7a2d"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "ffed0cde7d35ff2059588fb0511f33dc"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "ffed0cde7d35ff2059588fb0511f33dc": "WdEo#z^kDPE0kqo}_N%2H?Mxt8oztlRkITV@t7f+ogM{MyozozWB"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Attack_On_Titan_Final_Season_ESP2",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "c5c4acc5d54b6f3e41dfdc72fe5645ba",
+      "Container": "mov,mp4,m4a,3gp,3g2,mj2",
+      "ChannelId": null,
+      "Genres": [],
+      "RunTimeTicks": 50950849890,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2025-05-11T16:53:08.6472739Z",
+        "Played": false,
+        "Key": "c5c4acc5-d54b-6f3e-41df-dc72fe5645ba",
+        "ItemId": "c5c4acc5d54b6f3e41dfdc72fe5645ba"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "4c3328722e7269964a84d9d02414b983"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "4c3328722e7269964a84d9d02414b983": "WP9[Yyr]D%SdsWtR?]i{R%S|V@ofb]Rjt7WUM{aeo}S1bai{RjWB"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Babylon",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "14c97dcc6c5d694af856b57ff2e0dc60",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2022-12-22T00:00:00.0000000Z",
+      "CriticRating": 57,
+      "OfficialRating": "IT-14+",
+      "ChannelId": null,
+      "Overview": "Un racconto memorabile ambientato nella Los Angeles degli anni ’20, una storia di ambizioni smisurate e di eccessi oltraggiosi, che ripercorre l'ascesa e la caduta di molteplici personaggi in un'epoca di sfrenata decadenza e depravazione nella sfavillante Hollywood.",
+      "Genres": [
+        "Dramma",
+        "Commedia"
+      ],
+      "CommunityRating": 7.4,
+      "RunTimeTicks": 113360229999,
+      "ProductionYear": 2022,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        },
+        {
+          "Name": "Commedia",
+          "Id": "f924dc9db9119d5ba1aecee1223634e1"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2024-10-13T09:27:39.5405792Z",
+        "Played": false,
+        "Key": "615777",
+        "ItemId": "14c97dcc6c5d694af856b57ff2e0dc60"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "3757b324c7ca96d9afbc283275b3f0eb"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "3757b324c7ca96d9afbc283275b3f0eb": "daF;TKoMV@$z};WVa#xZ%0s-R*of%1s.V[jtadR*ofof"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Basilicata Coast to Coast",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "22e3afce5b552baccb296add5c1af79e",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2010-04-09T00:00:00.0000000Z",
+      "OfficialRating": "IT-T",
+      "ChannelId": null,
+      "Overview": "Da ragazzi erano una band di provincia, adesso sono un professore di matematica, un tabaccaio, un falegname e un attore. Non suonano insieme da più di dieci anni. Ma la passione mai spenta per la musica, riaffiora in una calda estate lucana insieme a una strampalata idea: attraversare a piedi la Basilicata dalla costa tirrenica a quella ionica, portando con sé il minimo indispensabile: due tende da campo, una piccola scorta di viveri e gli strumenti musicali. Il tutto caricato su un carretto trainato da un ronzino.",
+      "Genres": [
+        "Commedia",
+        "Dramma"
+      ],
+      "CommunityRating": 6.3,
+      "RunTimeTicks": 56029440000,
+      "ProductionYear": 2010,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Commedia",
+          "Id": "f924dc9db9119d5ba1aecee1223634e1"
+        },
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "22e3afce-5b55-2bac-cb29-6add5c1af79e",
+        "ItemId": "22e3afce5b552baccb296add5c1af79e"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "0726b14d9e86eacdc1589fff9738a880"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "0726b14d9e86eacdc1589fff9738a880": "d~Nc]A%Mt6xv_NofbIt7ShM{bHofxEs:s:oJx]tRofae"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Bastardi senza gloria",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "d95fa328c8ba7592abd93afbae034691",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2009-08-02T00:00:00.0000000Z",
+      "CriticRating": 89,
+      "OfficialRating": "IT-T",
+      "ChannelId": null,
+      "Overview": "Nella Francia occupata dai nazisti, durante la Seconda Guerra Mondiale, Shosanna Dreyfus assiste all'esecuzione della sua famiglia su ordine del colonnello nazista Hans Landa, ma riesce a fuggire a Parigi dove assume una nuova identità, come operatrice e titolare di un cinematografo. Nel frattempo, in un'altra località europea, il tenente Aldo Raine si mette alla guida di un gruppo di soldati ebrei conosciuti dai loro nemici come I Bastardi. Insieme ai suoi uomini, Raine collabora con con l'attrice tedesca Bridget Von Hammersmark, che in realtà è un agente segreto, in una missione speciale per rovesciare il Terzo Reich. Il loro destino si incrocerà con quello della Dreyfus, che tra l'altro sta pianificando una vendetta personale.",
+      "Genres": [
+        "Dramma",
+        "Thriller",
+        "Guerra"
+      ],
+      "CommunityRating": 8.216,
+      "RunTimeTicks": 91722240000,
+      "ProductionYear": 2009,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        },
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        },
+        {
+          "Name": "Guerra",
+          "Id": "b8097941dbc32a075bc720ea2bf9c039"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "d95fa328-c8ba-7592-abd9-3afbae034691",
+        "ItemId": "d95fa328c8ba7592abd93afbae034691"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "ce49aa8a79685da9a1980f491af9a3df"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "ce49aa8a79685da9a1980f491af9a3df": "dyNAI{xa_N?bVYRjx]xa^+ofR*t7o2aeozfkM|fkjsay"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Batman Begins",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "525e8dc31c0e19726f02d7229bc829f6",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2005-06-10T00:00:00.0000000Z",
+      "CriticRating": 85,
+      "OfficialRating": "IT-T",
+      "ChannelId": null,
+      "Overview": "Bruce Wayne, figlio di un illuminato filantropo di Gotham City, vede i suoi genitori assassinati da un rapinatore. Incapace di liberarsi del senso di colpa, inizia un vagabondaggio che lo porta fin sulle vette dell'Himalaya, dove Ra's Al Ghul e il suo fido Ducard lo iniziano alla lotta contro il male. Wayne è deciso a servire la giustizia, e una volta tornato a Gotham trova in Falcone, potente trafficante di droga, e in Crane, altrettanto corrotto psichiatra, due acerrimi nemici, dietro ai quali però pare celarsi qualcuno di ancor più potente. L'unico modo per combatterli è diventare Batman, un simbolo che dia forza e speranza alla gente.",
+      "Genres": [
+        "Azione",
+        "Crime",
+        "Dramma"
+      ],
+      "CommunityRating": 7.711,
+      "RunTimeTicks": 84039040000,
+      "ProductionYear": 2005,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Azione",
+          "Id": "d64acbbd8ee236556105ba4b02030a4d"
+        },
+        {
+          "Name": "Crime",
+          "Id": "83a9dab21914792744c8fb23b9925dc6"
+        },
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 1,
+        "IsFavorite": false,
+        "LastPlayedDate": "2025-01-11T22:12:37.7541252Z",
+        "Played": false,
+        "Key": "272",
+        "ItemId": "525e8dc31c0e19726f02d7229bc829f6"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "543c96deb9f71b7583acf26000f959d5"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "543c96deb9f71b7583acf26000f959d5": "dQD8RT$%nhV@}?xZNHRkEha|I;S35SNHoyoyEMRk-Ut7"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "A Beautiful Day - You Were Never Really Here",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "bea86616c9d3a1ac9210f77a0ecf060d",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2017-11-08T00:00:00.0000000Z",
+      "CriticRating": 89,
+      "OfficialRating": "IT-VM14",
+      "ChannelId": null,
+      "Overview": "Joe è un veterano di guerra che ha assistito a ogni tipo di brutalità e tortura.  Un'esistenza non facile, continuamente tormentata da terribili flashback del suo passato violento. Joe si guadagna da vivere liberando giovani ragazze dalla schiavitù sessuale a cui erano state costrette. Un giorno, un famoso politico di New York lo contatta per chiedergli aiuto. Sua figlia Nina, ancora giovanissima, sembra essere stata rapita da una delle organizzazioni criminali che gestiscono il giro di prostituzione minorile. Quando riuscirà a liberare Nina, però, si renderà conto che non si trattava di un semplice rapimento in cambio di denaro: Joe si trova così invischiato suo malgrado in una spirale molto più grande di lui, fatta di violenza senza scrupoli, e si rende conto di aver bisogno di aiuto per uscire da questa cospirazione: viaggio verso la morte o definitivo ritorno alla vita?",
+      "Genres": [
+        "Crime",
+        "Dramma",
+        "Thriller"
+      ],
+      "CommunityRating": 6.548,
+      "RunTimeTicks": 53685120000,
+      "ProductionYear": 2017,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Crime",
+          "Id": "83a9dab21914792744c8fb23b9925dc6"
+        },
+        {
+          "Name": "Dramma",
+          "Id": "612309d9abd3b3e69eaa8fef56f4e0ad"
+        },
+        {
+          "Name": "Thriller",
+          "Id": "4936f5b1a6f84f0b0aa2657368a5b364"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "bea86616-c9d3-a1ac-9210-f77a0ecf060d",
+        "ItemId": "bea86616c9d3a1ac9210f77a0ecf060d"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "da60b0dd6b6f7151c93da0fa082e2dd5"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "da60b0dd6b6f7151c93da0fa082e2dd5": "d87-]0%M00b^wFsjbbn$Dgt2?Gi_uPx]?Fj?VCs%x]WC"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Beetlejuice Beetlejuice",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "c940e39ad5ede6bc78a572a11eb5a2f5",
+      "HasSubtitles": true,
+      "Container": "mkv",
+      "PremiereDate": "2024-09-04T00:00:00.0000000Z",
+      "CriticRating": 77,
+      "OfficialRating": "PG-13",
+      "ChannelId": null,
+      "Overview": "Beetlejuice è tornato! Dopo un'inaspettata tragedia familiare, tre generazioni della famiglia Deetz tornano a casa a Winter River. Ancora perseguitata da Beetlejuice, la vita di Lydia viene sconvolta quando la figlia adolescente e ribelle, Astrid, scopre il misterioso modellino della città in soffitta e il portale per l'Aldilà viene accidentalmente aperto. Con i problemi che stanno nascendo in entrambi i regni, è solo questione di tempo prima che qualcuno pronunci tre volte il nome di Beetlejuice e il demone dispettoso torni nuovamente per scatenare il suo caos.",
+      "Genres": [
+        "Commedia",
+        "Fantasy",
+        "Horror"
+      ],
+      "CommunityRating": 7.2,
+      "RunTimeTicks": 63033600000,
+      "ProductionYear": 2024,
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [
+        {
+          "Name": "Commedia",
+          "Id": "f924dc9db9119d5ba1aecee1223634e1"
+        },
+        {
+          "Name": "Fantasy",
+          "Id": "a30dcc65be22eb3c21c03f7c1c7a57d1"
+        },
+        {
+          "Name": "Horror",
+          "Id": "8b9bd9a3eddad02f2b759b4938fdd0b8"
+        }
+      ],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "c940e39a-d5ed-e6bc-78a5-72a11eb5a2f5",
+        "ItemId": "c940e39ad5ede6bc78a572a11eb5a2f5"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "22d58b3d49acb53c7f30ff5a6af235bc"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "22d58b3d49acb53c7f30ff5a6af235bc": "d87-mH%h:[-qkIV|J%bH0xMz5QIoxvo{=wtRVgob-,oz"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    },
+    {
+      "Name": "Boris",
+      "ServerId": "d542488cccf044ce8759cdd884eb173e",
+      "Id": "e54cc435d72f64acad246ef5e6f7f9a4",
+      "Container": "mkv",
+      "ChannelId": null,
+      "Overview": "",
+      "Genres": [],
+      "RunTimeTicks": 60713680000,
+      "AspectRatio": "",
+      "IsFolder": false,
+      "Type": "Movie",
+      "GenreItems": [],
+      "UserData": {
+        "PlaybackPositionTicks": 0,
+        "PlayCount": 0,
+        "IsFavorite": false,
+        "Played": false,
+        "Key": "e54cc435-d72f-64ac-ad24-6ef5e6f7f9a4",
+        "ItemId": "e54cc435d72f64acad246ef5e6f7f9a4"
+      },
+      "VideoType": "VideoFile",
+      "ImageTags": {
+        "Primary": "1d92268e20cb4dde4a7256e90211210c"
+      },
+      "ImageBlurHashes": {
+        "Primary": {
+          "1d92268e20cb4dde4a7256e90211210c": "W9BomtQ,OR~Dn5$c$-$^s:w}$wsEEMt7-7NKS1s;t2sX$yJBNIxY"
+        }
+      },
+      "LocationType": "FileSystem",
+      "MediaType": "Video"
+    }
+  ],
+  "totalCount": 236,
+  "page": 0,
+  "pageSize": 24
+}

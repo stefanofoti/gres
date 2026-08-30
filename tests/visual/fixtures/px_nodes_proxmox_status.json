@@ -1,0 +1,55 @@
+{
+  "pveversion": "pve-manager/9.1.6/71482d1833ded40a",
+  "memory": {
+    "available": 781438976,
+    "total": 12444188672,
+    "free": 427126784,
+    "used": 11662749696
+  },
+  "idle": 0,
+  "kversion": "Linux 6.17.13-2-pve #1 SMP PREEMPT_DYNAMIC PMX 6.17.13-2 (2026-03-13T08:06Z)",
+  "loadavg": [
+    "0.30",
+    "0.31",
+    "0.28"
+  ],
+  "current-kernel": {
+    "sysname": "Linux",
+    "release": "6.17.13-2-pve",
+    "machine": "x86_64",
+    "version": "#1 SMP PREEMPT_DYNAMIC PMX 6.17.13-2 (2026-03-13T08:06Z)"
+  },
+  "ksm": {
+    "shared": 342949888
+  },
+  "uptime": 444985,
+  "rootfs": {
+    "used": 78675726336,
+    "free": 22186000384,
+    "total": 100861726720,
+    "avail": 17015263232
+  },
+  "swap": {
+    "used": 12288,
+    "free": 8589918208,
+    "total": 8589930496
+  },
+  "cpuinfo": {
+    "hvm": "1",
+    "sockets": 1,
+    "cpus": 4,
+    "user_hz": 100,
+    "mhz": "2395.050",
+    "flags": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm cpuid_fault epb pti ssbd ibrs ibpb stibp tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid xsaveopt dtherm ida arat pln pts vnmi md_clear flush_l1d",
+    "family": "6",
+    "vendor": "GenuineIntel",
+    "cores": 2,
+    "model": "Intel(R) Core(TM) i5-4210U CPU @ 1.70GHz"
+  },
+  "wait": 0,
+  "boot-info": {
+    "mode": "efi",
+    "secureboot": 0
+  },
+  "cpu": 0
+}

@@ -1,0 +1,260 @@
+[
+  {
+    "entity_id": "light.smart_mat_g95_100_tw_827_e27",
+    "state": "off",
+    "attributes": {
+      "min_color_temp_kelvin": 2702,
+      "max_color_temp_kelvin": 6535,
+      "min_mireds": 153,
+      "max_mireds": 370,
+      "supported_color_modes": [
+        "color_temp"
+      ],
+      "color_mode": null,
+      "brightness": null,
+      "color_temp_kelvin": null,
+      "color_temp": null,
+      "hs_color": null,
+      "rgb_color": null,
+      "xy_color": null,
+      "friendly_name": "Luce Cucina",
+      "supported_features": 32
+    },
+    "last_changed": "2026-08-29T19:19:01.486412+00:00",
+    "last_reported": "2026-08-29T19:19:01.486412+00:00",
+    "last_updated": "2026-08-29T19:19:01.486412+00:00",
+    "context": {
+      "id": "01M17FC1KE2P17K8JBFHNXGDDS",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "light.yeelight",
+    "state": "unavailable",
+    "attributes": {
+      "min_color_temp_kelvin": 1700,
+      "max_color_temp_kelvin": 6500,
+      "min_mireds": 153,
+      "max_mireds": 588,
+      "effect_list": [
+        "Strobe color",
+        "Police",
+        "Christmas",
+        "RGB",
+        "Random Loop",
+        "Fast Random Loop",
+        "LSD",
+        "Slowdown",
+        "Night Mode",
+        "Date Night",
+        "Movie",
+        "Sunrise",
+        "Sunset",
+        "Romance",
+        "Happy Birthday",
+        "Disco",
+        "Strobe epilepsy!",
+        "Alarm",
+        "Police2",
+        "WhatsApp",
+        "Facebook",
+        "Twitter",
+        "Home",
+        "Candle Flicker",
+        "Tea Time",
+        "Slow Temp",
+        "Stop"
+      ],
+      "supported_color_modes": [
+        "color_temp",
+        "hs",
+        "rgb"
+      ],
+      "friendly_name": "Yeelight",
+      "supported_features": 44
+    },
+    "last_changed": "2026-08-29T18:20:16.186028+00:00",
+    "last_reported": "2026-08-29T18:20:16.186028+00:00",
+    "last_updated": "2026-08-29T18:20:16.186028+00:00",
+    "context": {
+      "id": "01M17C0EXTXFCZ8WGEDDAAWM68",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "media_player.samsung_au7090_55_tv",
+    "state": "unavailable",
+    "attributes": {
+      "friendly_name": "Samsung AU7090 55 TV",
+      "supported_features": 0
+    },
+    "last_changed": "2026-08-30T15:23:28.072490+00:00",
+    "last_reported": "2026-08-30T15:49:57.123854+00:00",
+    "last_updated": "2026-08-30T15:23:28.072490+00:00",
+    "context": {
+      "id": "01M19M9EE804FQYDWTXD96272V",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "switch.desktop_presa",
+    "state": "off",
+    "attributes": {
+      "device_class": "outlet",
+      "friendly_name": "Ventilatore Presa"
+    },
+    "last_changed": "2026-08-30T07:18:54.223166+00:00",
+    "last_reported": "2026-08-30T07:36:13.921735+00:00",
+    "last_updated": "2026-08-30T07:18:54.223166+00:00",
+    "context": {
+      "id": "01M18RJ60FBNQWCF8YQKNB5XGV",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "switch.ciabatta_socket_1",
+    "state": "on",
+    "attributes": {
+      "device_class": "outlet",
+      "friendly_name": "Ciabatta TV"
+    },
+    "last_changed": "2026-08-25T17:51:58.671783+00:00",
+    "last_reported": "2026-08-26T12:14:29.866095+00:00",
+    "last_updated": "2026-08-25T17:51:58.671783+00:00",
+    "context": {
+      "id": "01M0X0SS6F4VVR4DS0T2BZDXFS",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "switch.ciabatta_socket_2",
+    "state": "on",
+    "attributes": {
+      "device_class": "outlet",
+      "friendly_name": "Server"
+    },
+    "last_changed": "2026-08-25T12:39:06.532295+00:00",
+    "last_reported": "2026-08-25T12:39:06.532295+00:00",
+    "last_updated": "2026-08-25T12:39:06.532295+00:00",
+    "context": {
+      "id": "01M0WEWX14SWEYEPBHE4Y1B4PK",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "switch.ciabatta_socket_3",
+    "state": "on",
+    "attributes": {
+      "device_class": "outlet",
+      "friendly_name": "Zimablade"
+    },
+    "last_changed": "2026-08-25T12:39:06.532754+00:00",
+    "last_reported": "2026-08-25T12:39:06.532754+00:00",
+    "last_updated": "2026-08-25T12:39:06.532754+00:00",
+    "context": {
+      "id": "01M0WEWX14HD7K3SSJR5JZ2VQN",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "switch.ciabatta_socket_4",
+    "state": "off",
+    "attributes": {
+      "device_class": "outlet",
+      "friendly_name": "Albero"
+    },
+    "last_changed": "2026-08-30T12:37:34.723632+00:00",
+    "last_reported": "2026-08-30T12:37:34.878577+00:00",
+    "last_updated": "2026-08-30T12:37:34.723632+00:00",
+    "context": {
+      "id": "01M19ASPC3NZR9F3MGGK01GPY2",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "switch.ciabatta_usb_1",
+    "state": "on",
+    "attributes": {
+      "friendly_name": "Ciabatta USB 1"
+    },
+    "last_changed": "2026-08-25T17:51:58.969774+00:00",
+    "last_reported": "2026-08-26T12:14:29.866343+00:00",
+    "last_updated": "2026-08-25T17:51:58.969774+00:00",
+    "context": {
+      "id": "01M0X0SSFSW018TDWVDPAWF7XT",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "media_player.samsung_au7090_55_tv_2",
+    "state": "off",
+    "attributes": {
+      "source_list": [
+        "TV",
+        "HDMI"
+      ],
+      "device_class": "tv",
+      "friendly_name": "Samsung AU7090 55 TV",
+      "supported_features": 24509
+    },
+    "last_changed": "2026-08-30T15:23:32.752765+00:00",
+    "last_reported": "2026-08-30T15:50:04.760419+00:00",
+    "last_updated": "2026-08-30T15:23:32.752765+00:00",
+    "context": {
+      "id": "01M19M9K0GASYXGJMC86GABJJE",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "media_player.samsung_au7090_55_tv_3",
+    "state": "off",
+    "attributes": {
+      "device_class": "tv",
+      "friendly_name": "Samsung AU7090 55 TV",
+      "supported_features": 23997
+    },
+    "last_changed": "2026-08-30T15:23:28.888282+00:00",
+    "last_reported": "2026-08-30T15:23:32.190710+00:00",
+    "last_updated": "2026-08-30T15:23:28.888282+00:00",
+    "context": {
+      "id": "01M19M9F7R2MFM7QJKY4JFXKCC",
+      "parent_id": null,
+      "user_id": null
+    }
+  },
+  {
+    "entity_id": "light.luce_tv",
+    "state": "unavailable",
+    "attributes": {
+      "restored": true,
+      "min_color_temp_kelvin": 2000,
+      "max_color_temp_kelvin": 9009,
+      "min_mireds": 111,
+      "max_mireds": 500,
+      "supported_color_modes": [
+        "color_temp",
+        "hs"
+      ],
+      "friendly_name": "Luce TV",
+      "supported_features": 19
+    },
+    "last_changed": "2026-08-25T12:39:08.723181+00:00",
+    "last_reported": "2026-08-25T12:39:08.723181+00:00",
+    "last_updated": "2026-08-25T12:39:08.723181+00:00",
+    "context": {
+      "id": "01M0WEWZ5KRSQQ69315X958FVE",
+      "parent_id": null,
+      "user_id": null
+    }
+  }
+]
