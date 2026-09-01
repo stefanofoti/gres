@@ -1,0 +1,65 @@
+{
+  "weather_default_location": {
+    "id": "3173435",
+    "name": "Milano",
+    "admin1": "Lombardia",
+    "country": "Italia",
+    "latitude": 45.46427,
+    "longitude": 9.18951,
+    "timezone": "Europe/Rome"
+  },
+  "ha_url": "http://homeassistant.local:8123",
+  "ha_token": "REDACTED-ha-token-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "jf_url": "http://jellyfin.local:8096",
+  "jf_token": "REDACTED-jf-keyxxxxxxxxxxxxxxxxx",
+  "px_url": "https://proxmox.local:8006",
+  "px_tokenid": "root@pam!fake",
+  "px_token": "REDACTED-px-secret-0000-0000-000000",
+  "home_widgets": [
+    {
+      "type": "smarthome",
+      "id": "light.smart_mat_g95_100_tw_827_e27",
+      "label": "Luce Cucina"
+    },
+    {
+      "type": "smarthome",
+      "id": "light.yeelight",
+      "label": "Yeelight"
+    },
+    {
+      "type": "smarthome",
+      "id": "switch.desktop_presa",
+      "label": "Ventilatore Presa"
+    },
+    {
+      "type": "smarthome",
+      "id": "switch.ciabatta_socket_4",
+      "label": "Albero"
+    },
+    {
+      "type": "meteo",
+      "id": "weather",
+      "label": "Weather widget"
+    },
+    {
+      "type": "jelly",
+      "id": "jellyfin",
+      "label": "Jellyfin widget"
+    },
+    {
+      "type": "server",
+      "id": "server",
+      "label": "Server widget"
+    },
+    {
+      "type": "markets",
+      "id": "AAPL",
+      "label": "Apple Inc. (AAPL)"
+    },
+    {
+      "type": "markets",
+      "id": "ENI.MI",
+      "label": "Eni S.p.A. (ENI.MI)"
+    }
+  ]
+}

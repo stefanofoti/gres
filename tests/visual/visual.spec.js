@@ -189,6 +189,23 @@ test.describe('overlays', function () {
     await expect(page).toHaveScreenshot('overlay-pin.png');
   });
 
+  /* The forecast rows are a day picker, so the browsed state is a real
+     view — and the only one the tab-level shots never reach. Both themes,
+     because the day bar, the back button and the selected-row treatment
+     are all new CSS with no other coverage. */
+  ['dark', 'light'].forEach(function (theme) {
+    test('weather day detail @ ' + theme, async function ({ page }) {
+      await gotoApp(page, { theme: theme, fontSize: 'normal' });
+      await openTab(page, 'meteo');
+      var day = page.locator('#wx-days .wx-day').nth(3);
+      if (await day.count()) {
+        await day.click();
+        await page.waitForTimeout(600);
+        await expect(page).toHaveScreenshot('overlay-weather-day-' + theme + '.png');
+      }
+    });
+  });
+
   test('jellyfin detail', async function ({ page }) {
     await gotoApp(page, { theme: 'dark', fontSize: 'normal' });
     await openTab(page, 'jelly');

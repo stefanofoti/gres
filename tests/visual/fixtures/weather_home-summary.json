@@ -1,0 +1,89 @@
+{
+  "location": {
+    "name": "Milano",
+    "country": "Italia"
+  },
+  "current": {
+    "temp": 7,
+    "weatherCode": 3,
+    "isDay": 1,
+    "humidity": 78,
+    "wind": 9
+  },
+  "today": {
+    "tempMax": 9,
+    "tempMin": 2,
+    "precipProb": 20,
+    "weatherCode": 3
+  },
+  "hourly": [
+    {
+      "time": "2026-01-11T10:00",
+      "hour": 10,
+      "temp": 7,
+      "code": 3,
+      "precipProb": 10
+    },
+    {
+      "time": "2026-01-11T11:00",
+      "hour": 11,
+      "temp": 8,
+      "code": 3,
+      "precipProb": 10
+    },
+    {
+      "time": "2026-01-11T12:00",
+      "hour": 12,
+      "temp": 9,
+      "code": 2,
+      "precipProb": 20
+    },
+    {
+      "time": "2026-01-11T13:00",
+      "hour": 13,
+      "temp": 9,
+      "code": 2,
+      "precipProb": 40
+    },
+    {
+      "time": "2026-01-11T14:00",
+      "hour": 14,
+      "temp": 8,
+      "code": 61,
+      "precipProb": 80
+    },
+    {
+      "time": "2026-01-11T15:00",
+      "hour": 15,
+      "temp": 7,
+      "code": 61,
+      "precipProb": 70
+    }
+  ],
+  "daily": [
+    {
+      "date": "2026-01-12",
+      "weekday": "Mon",
+      "max": 8,
+      "min": 3,
+      "code": 61,
+      "precipProb": 80
+    },
+    {
+      "date": "2026-01-13",
+      "weekday": "Tue",
+      "max": 11,
+      "min": 1,
+      "code": 0,
+      "precipProb": 0
+    },
+    {
+      "date": "2026-01-14",
+      "weekday": "Wed",
+      "max": 12,
+      "min": 4,
+      "code": 2,
+      "precipProb": 10
+    }
+  ]
+}

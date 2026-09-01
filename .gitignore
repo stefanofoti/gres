@@ -1,5 +1,10 @@
 node_modules/
-settings.json
+# The credentials store lives at data/settings.json and is covered by the
+# `data/` rule below. A bare `settings.json` pattern also matched
+# tests/visual/fixtures/settings.json — the redacted fixture the visual
+# suite replays — which left the Home baselines unreproducible on a fresh
+# clone. capture-fixtures.js fails the capture if a real value ever
+# reaches a fixture, so the fixture is safe to track.
 data/
 .env
 .DS_Store

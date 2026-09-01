@@ -62,6 +62,7 @@
   --icon-accent: #d7d7ff;
 
   /* type scale — rem, so root font-size scales all of it */
+  --text-3xs: 0.625rem;           /* 10px @ root 16 — widget metric labels */
   --text-2xs: 0.6875rem;          /* 11px @ root 16 */
   --text-xs: 0.75rem;             /* 12px @ root 16 */
   --text-sm: 0.8125rem;           /* 13px @ root 16 */
@@ -294,44 +295,65 @@ html, body {
 .coming-title { font-size: var(--text-xl); font-weight: 300; color: var(--text-primary); margin-bottom: var(--space-xs); }
 .coming-desc  { font-size: var(--text-sm); color: var(--text-muted-soft); }
 
-/* ── Weather ────────────────────────────────────────── */
-#page-meteo .page-content { padding: var(--space-md) var(--space-lg) 1.625rem; }
-.weather-top-actions { margin: var(--space-2xs) 0 var(--space-md); display: -webkit-flex; display: -webkit-box; display: flex; }
-.weather-top-actions > * + * { margin-left: var(--space-sm); }
-.weather-top-actions .btn-icon-only {
-  -webkit-box-flex: 0; -webkit-flex: 0 0 auto; flex: 0 0 auto;
-  width: 40px; height: 40px; padding: 0;
-  border-radius: 0.5625rem; border: 1px solid var(--border-strong);
-  background: var(--surface); color: var(--text-primary-dim);
-  font-size: var(--text-xl); font-weight: bold; cursor: pointer;
-  -webkit-transition: opacity 0.12s; transition: opacity 0.12s;
-  display: -webkit-flex; display: -webkit-box; display: flex;
+/* ═══════════════════════════════════════════════════════
+   WEATHER TAB
+
+   Four stacked blocks — hero, hourly strip, metric tiles,
+   10-day list — each of which reflows independently, so the
+   tab fills a 1366px wall panel as readily as a 375px phone.
+
+   iOS 9.3 rules that shape this section:
+     - no `gap`, no CSS Grid: the metric tiles are a wrapping
+       flex grid with uniform margins and calc() widths, and
+       the 0.5rem inside each width is exactly 2x the tile
+       margin (var() inside calc() is unreliable here);
+     - the hourly strip scrolls with -webkit-overflow-scrolling,
+       which is what iOS 9 has instead of scroll-snap;
+     - no date parsing anywhere: every clock label and weekday
+       arrives pre-formatted from /api/weather/forecast,
+       because a timezone-less ISO string parses as UTC under
+       the ES5 rule this engine follows.
+   ═══════════════════════════════════════════════════════ */
+#page-meteo .page-content { padding: 0 var(--space-md) 1.625rem; }
+
+/* ── header with inline actions ─────────────────────── */
+.wx-header {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+}
+.wx-header-text { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 0; }
+.wx-header-actions {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.wx-header-actions > * + * { margin-left: var(--space-sm); }
+
+.wx-icon-btn {
+  width: 38px; height: 38px; padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-secondary-light);
+  cursor: pointer; line-height: 0;
+  -webkit-tap-highlight-color: transparent;
+  display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
   -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
-  position: relative; line-height: 1; text-align: center;
-  -webkit-transform: translateZ(0);
+  -webkit-transition: opacity 0.12s; transition: opacity 0.12s;
 }
-.weather-top-actions .btn-icon-only:active { opacity: 0.65; }
-.weather-top-actions .btn-secondary {
-  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
-  padding: var(--space-md) var(--space-base);
-}
+.wx-icon-btn:active   { opacity: 0.6; }
+.wx-icon-btn.is-active { border-color: var(--accent-dim); color: var(--accent-bright); }
+.wx-icon-btn.is-busy   { opacity: 0.45; pointer-events: none; }
 
-.weather-top-actions .btn-icon-only svg,
-.feat-widget-add-btn svg {
-  margin: auto;
-}
-
-.weather-search-panel {
+/* ── location search ────────────────────────────────── */
+.wx-search-panel {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-md);
-  margin-bottom: var(--space-base);
+  margin: 0 var(--space-2xs) var(--space-base);
 }
-.weather-search-results {
-  margin-top: var(--space-sm);
-}
+.weather-search-results { margin-top: var(--space-sm); }
 .weather-search-item {
   width: 100%;
   border: 1px solid var(--border-strong);
@@ -351,143 +373,380 @@ html, body {
 }
 .weather-search-item:active { opacity: 0.7; }
 
-#weather-refresh-btn, .btn-icon-only {
-  text-align: center;
-  padding: 0;
-  display: block;
-  line-height: 32px;
-  margin-right: 0.3125rem;
+/* ── shared section chrome ──────────────────────────── */
+.wx-section { margin-top: var(--space-lg); }
+.wx-section-title {
+  font-size: var(--text-2xs); font-weight: 500; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-muted-warm);
+  padding: 0 var(--space-2xs) var(--space-sm);
 }
 
-.weather-now-card {
-  background: radial-gradient(circle at 80% 10%, rgba(160,160,255,0.14) 0%, rgba(160,160,255,0) 45%), var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: var(--space-lg) var(--space-lg) var(--space-base);
-  margin-bottom: var(--space-md);
+/* ── reference-day bar ──────────────────────────────
+   Sits above everything and names the day the hero, strip and tiles
+   are describing. Always present, so selecting a day never shifts the
+   layout — only the label changes, and the way back appears. */
+.wx-daybar {
   display: -webkit-box; display: -webkit-flex; display: flex;
-}
-.weather-now-main {
-  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  padding: 0 var(--space-2xs) var(--space-sm);
   min-width: 0;
 }
-.weather-now-city {
-  font-size: var(--text-base);
-  color: var(--text-primary-dim);
-  letter-spacing: 0.03em;
-}
-.weather-now-temp {
-  font-size: var(--text-5xl);
-  font-weight: 300;
-  line-height: 1;
-  color: var(--text-bright);
-  margin: var(--space-2xs) 0 0.1875rem;
-}
-.weather-now-desc {
-  font-size: var(--text-base);
-  color: var(--text-secondary-light);
-}
-.weather-now-side {
-  width: 110px;
-  padding-left: var(--space-md);
-}
-.weather-now-line {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
-  text-align: right;
-}
-.weather-now-line strong {
-  display: block;
-  color: var(--text-primary-soft);
-  font-size: var(--text-base);
-  font-family: 'DM Mono', monospace;
-  margin-top: var(--space-3xs);
-}
-
-.weather-highlight-grid {
+.wx-daybar-label {
   display: -webkit-box; display: -webkit-flex; display: flex;
-  margin: 0 -0.25rem var(--space-md);
+  -webkit-box-align: baseline; -webkit-align-items: baseline; align-items: baseline;
+  min-width: 0;
 }
-.weather-day-card {
-  width: 50%;
+.wx-daybar-today {
+  font-size: var(--text-2xs); font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent-bright);
+  margin-right: var(--space-sm);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.wx-daybar-date {
+  font-size: var(--text-md); color: var(--text-primary-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.wx-daybar-spacer { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; }
+.wx-daybar-back {
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  margin-left: var(--space-sm);
+  padding: var(--space-2xs) var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-accent-strong);
+  background: var(--surface);
+  color: var(--accent-bright);
+  font-family: inherit; font-size: var(--text-xs);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.wx-daybar-back:active { opacity: 0.6; }
+
+/* ── hero ───────────────────────────────────────────── */
+/* The gradient shifts with day/night so the card reads as the
+   current sky at a glance, before any number is parsed. */
+.wx-hero {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  background: radial-gradient(circle at 82% 12%, rgba(160,160,255,0.16) 0%, rgba(160,160,255,0) 52%), var(--surface);
+  padding: var(--space-lg);
   margin: 0 var(--space-2xs);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 0.875rem;
-  padding: 0.6875rem var(--space-md);
 }
-.weather-day-label {
-  font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
-}
-.weather-day-temp span {
-  font-size: var(--text-2xl);
-  color: var(--text-primary-soft);
-  font-weight: 300;
-}
-.weather-day-temp small {
-  margin-left: 0.4375rem;
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-.weather-day-desc {
-  margin-top: 0.3125rem;
-  font-size: var(--text-sm);
-  color: var(--text-primary-dim);
+.wx-hero.is-night {
+  background: radial-gradient(circle at 82% 12%, rgba(110,110,190,0.18) 0%, rgba(110,110,190,0) 52%), var(--surface);
 }
 
-.weather-chart-block .section-label {
-  padding: var(--space-lg) var(--space-3xs) var(--space-sm);
+.wx-hero-top {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: baseline; -webkit-align-items: baseline; align-items: baseline;
+  margin-bottom: var(--space-base);
+  min-width: 0;
 }
-.weather-chart {
-  height: 148px;
+.wx-hero-loc {
+  font-size: var(--text-base); color: var(--text-primary-dim);
+  letter-spacing: 0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.wx-hero-updated {
+  font-size: var(--text-2xs); color: var(--text-faint-light);
+  margin-left: var(--space-sm); white-space: nowrap;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+
+.wx-hero-main {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  min-width: 0;
+}
+.wx-hero-icon {
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  line-height: 0; margin-right: var(--space-base);
+}
+.wx-hero-temp {
+  font-size: var(--text-5xl); font-weight: 300; line-height: 1;
+  color: var(--text-bright);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.wx-hero-meta { margin-left: var(--space-base); min-width: 0; }
+.wx-hero-cond {
+  font-size: var(--text-md); color: var(--text-secondary-light);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wx-hero-feels {
+  font-size: var(--text-xs); color: var(--text-faint-light);
+  margin-top: 0.125rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wx-hero-range {
+  margin-left: var(--space-base); text-align: right;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.wx-hero-range-hi {
+  font-size: var(--text-lg); color: var(--text-primary-soft); font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+.wx-hero-range-lo {
+  font-size: var(--text-sm); color: var(--text-faint-warm);
+  margin-top: 0.125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── hourly strip ───────────────────────────────────── */
+/* Horizontal scroll rather than a squeeze: 24 columns never fit,
+   and momentum scrolling is what iOS 9 has instead of snap points. */
+.wx-hours-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-xs) var(--space-2xs) var(--space-2xs);
+  margin: 0 var(--space-2xs);
 }
-.weather-chart .ct-line { stroke-width: 2px; }
-.weather-chart .ct-series-a .ct-line,
-.weather-chart .ct-series-a .ct-point { stroke: var(--icon-accent); }
-.weather-chart .ct-series-b .ct-line,
-.weather-chart .ct-series-b .ct-point { stroke: var(--icon-muted); }
-.weather-chart .ct-label {
-  fill: var(--text-muted-light);
-  color: var(--text-muted-light);
-  font-size: var(--text-2xs);
+.wx-hours {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  padding: var(--space-base) var(--space-xs);
 }
+.wx-hour {
+  width: 3.5rem;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  text-align: center;
+  padding: 0 var(--space-3xs);
+}
+.wx-hour.is-now .wx-hour-label { color: var(--accent-bright); font-weight: 500; }
+.wx-hour-label {
+  font-size: var(--text-2xs); color: var(--text-faint-light);
+  font-variant-numeric: tabular-nums;
+}
+.wx-hour-icon { line-height: 0; margin: var(--space-xs) 0; }
+.wx-hour-temp {
+  font-size: var(--text-sm); color: var(--text-primary-soft);
+  font-variant-numeric: tabular-nums;
+}
+.wx-hour-precip {
+  font-size: var(--text-3xs); color: var(--info);
+  margin-top: 0.125rem; height: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+/* A day/night band under each column: the strip crosses sunset, and
+   this shows where without spending a row on it. */
+.wx-hour-band {
+  height: 0.1875rem; border-radius: 0.09375rem;
+  margin-top: var(--space-2xs);
+  background: var(--surface-accent);
+}
+.wx-hour.is-day .wx-hour-band { background: rgba(245, 216, 78, 0.45); }
 
-.weather-days-list {
+/* ── metric tiles ───────────────────────────────────── */
+/* 0.5rem == 2x the tile margin below. Both literals, kept in sync
+   by hand: var() inside calc() is unreliable on this engine. */
+.wx-metrics {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-wrap: wrap; flex-wrap: wrap;
+  -webkit-box-align: stretch; -webkit-align-items: stretch; align-items: stretch;
+  margin-top: var(--space-lg);
+}
+.wx-metric {
+  width: calc(50% - 0.5rem);
+  margin: var(--space-2xs);
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  padding: var(--space-base) var(--space-md);
+  min-width: 0;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
 }
-.weather-day-row {
+@media (min-width: 600px)  { .wx-metric { width: calc(33.3333% - 0.5rem); } }
+@media (min-width: 1024px) { .wx-metric { width: calc(25% - 0.5rem); } }
+
+.wx-metric-label {
+  font-size: var(--text-3xs); font-weight: 500; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--text-faint-light);
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+}
+.wx-metric-label svg { margin-right: 0.25rem; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.wx-metric-value {
+  font-size: var(--text-xl); font-weight: 300; color: var(--text-primary-soft);
+  margin-top: var(--space-2xs); line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wx-metric-sub {
+  font-size: var(--text-2xs); color: var(--text-faint-warm);
+  margin-top: 0.125rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* pushes any bar/arc to the bottom so tiles in a row align */
+.wx-metric-foot {
+  margin-top: auto; padding-top: var(--space-sm);
+}
+
+/* UV scale: a fixed gradient with a marker, so the number lands on a
+   scale the reader already understands. */
+.wx-scale {
+  height: 0.25rem; border-radius: 0.125rem; position: relative;
+  background: -webkit-linear-gradient(left, #3ddc84 0%, #f4a522 45%, #ff5f57 75%, #b06cf0 100%);
+  background: linear-gradient(to right, #3ddc84 0%, #f4a522 45%, #ff5f57 75%, #b06cf0 100%);
+}
+.wx-scale-marker {
+  position: absolute; top: -0.1875rem;
+  width: 0.625rem; height: 0.625rem;
+  margin-left: -0.3125rem;
+  border-radius: 50%;
+  background: var(--text-bright);
+  border: 2px solid var(--surface);
+}
+
+/* Sun arc: sunrise on the left, sunset on the right, a marker where
+   the day currently is. */
+.wx-arc {
+  height: 0.25rem; border-radius: 0.125rem; position: relative;
+  background: var(--surface-accent);
+}
+.wx-arc-fill {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  border-radius: 0.125rem;
+  background: -webkit-linear-gradient(left, #f5d84e, #f4a522);
+  background: linear-gradient(to right, #f5d84e, #f4a522);
+}
+.wx-arc-marker {
+  position: absolute; top: -0.1875rem;
+  width: 0.625rem; height: 0.625rem;
+  margin-left: -0.3125rem;
+  border-radius: 50%;
+  background: #f5d84e;
+  border: 2px solid var(--surface);
+}
+.wx-arc-ends {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  font-size: var(--text-3xs); color: var(--text-faint-light);
+  margin-top: var(--space-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Wind dial: the arrow points the way the wind is going. */
+.wx-wind-arrow {
+  display: inline-block; line-height: 0;
+  -webkit-transition: -webkit-transform 0.3s; transition: transform 0.3s;
+}
+
+/* ── 10-day list ────────────────────────────────────── */
+.wx-days {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-wrap: wrap; flex-wrap: wrap;
+  margin: 0 var(--space-2xs);
+}
+/* Each row is a <button>: it is the day picker, so it has to be
+   keyboard-reachable and announced as actionable. Safari 9 applies its
+   own button metrics, so the reset has to be explicit — `font: inherit`
+   and a stated width, or the row's type and height shift on the device
+   and nowhere else. */
+.wx-day {
+  width: 100%;
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
   padding: var(--space-md) var(--space-base);
-  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-2xs);
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-transition: opacity 0.12s, border-color 0.15s;
+  transition: opacity 0.12s, border-color 0.15s;
 }
-.weather-day-row:last-child { border-bottom: none; }
-.weather-day-name {
-  width: 30%;
+.wx-day:active { opacity: 0.65; }
+/* Two columns once there is room; 0.25rem is 2x the horizontal margin
+   the second column picks up below. */
+@media (min-width: 1024px) {
+  .wx-day { width: calc(50% - 0.25rem); margin-right: var(--space-2xs); }
+  .wx-day:nth-child(even) { margin-right: 0; }
+}
+.wx-day.is-today { border-color: var(--border-accent-strong); }
+/* The row everything above is currently describing. Declared after
+   .is-today deliberately: the two share specificity, and when today is
+   also the selected day the selection is the more useful signal. */
+.wx-day.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.wx-day-name {
+  width: 3.25rem; -webkit-flex-shrink: 0; flex-shrink: 0;
+  font-size: var(--text-sm); color: var(--text-primary-soft);
+}
+.wx-day.is-today .wx-day-name { color: var(--accent-bright); }
+.wx-day-icon {
+  line-height: 0; width: 1.5rem;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.wx-day-precip {
+  width: 2.5rem; -webkit-flex-shrink: 0; flex-shrink: 0;
+  font-size: var(--text-2xs); color: var(--info);
+  margin-left: var(--space-2xs);
+  font-variant-numeric: tabular-nums;
+}
+.wx-day-lo, .wx-day-hi {
+  width: 2.25rem; -webkit-flex-shrink: 0; flex-shrink: 0;
   font-size: var(--text-sm);
-  color: var(--text-primary-soft);
+  font-variant-numeric: tabular-nums;
 }
-.weather-day-summary {
+.wx-day-lo { color: var(--text-faint-warm); text-align: right; }
+.wx-day-hi { color: var(--text-bright); text-align: right; }
+
+/* The range bar is the part that makes ten rows readable at a glance:
+   each day's min-max is drawn against the whole span of the ten days,
+   so a cold snap or a warm run shows as a shape rather than as numbers
+   the reader has to compare by hand. */
+.wx-day-bar {
   -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
-  font-size: var(--text-xs);
-  color: var(--text-secondary-soft);
+  height: 0.25rem; border-radius: 0.125rem;
+  background: var(--surface-accent);
+  margin: 0 var(--space-sm);
+  position: relative;
+  min-width: 2rem;
 }
-.weather-day-range {
-  font-size: var(--text-sm);
-  color: var(--text-bright);
-  font-family: 'DM Mono', monospace;
+.wx-day-bar-fill {
+  position: absolute; top: 0; bottom: 0;
+  border-radius: 0.125rem;
+  background: -webkit-linear-gradient(left, #6ba8f0, #f5d84e);
+  background: linear-gradient(to right, #6ba8f0, #f5d84e);
+}
+/* Where the temperature is right now, on today's row only. */
+.wx-day-bar-now {
+  position: absolute; top: -0.125rem;
+  width: 0.5rem; height: 0.5rem;
+  margin-left: -0.25rem;
+  border-radius: 50%;
+  background: var(--text-bright);
+  border: 2px solid var(--surface);
+}
+
+/* ── Short-viewport budget ───────────────────────────
+   Phone landscape has ~300px of content height. The header and hero
+   alone would fill it, pushing the hourly strip — the thing most worth
+   glancing at — below the fold, so both are trimmed here. Placed at the
+   end of the section on purpose: these selectors match the specificity
+   of the base rules above and win only on source order. */
+@media (orientation: landscape) and (max-height: 500px) {
+  #page-meteo .page-header { padding-top: var(--space-lg); padding-bottom: var(--space-md); }
+  .wx-hero { padding: var(--space-md); }
+  .wx-hero-top { margin-bottom: var(--space-sm); }
+  .wx-hero-icon { margin-right: var(--space-md); }
+  .wx-hero-icon svg { width: 40px; height: 40px; }
+  .wx-hero-temp { font-size: var(--text-3xl); }
+  .wx-section { margin-top: var(--space-md); }
+  .wx-hours { padding: var(--space-sm) var(--space-xs); }
+  .wx-metrics { margin-top: var(--space-md); }
 }
 
 /* ── Markets ────────────────────────────────────────── */
@@ -916,56 +1175,252 @@ html, body {
   #app { top: 34px; bottom: calc(46px + env(safe-area-inset-bottom, 0px)); }
   #tab-bar { min-height: 46px; }
   .tab-icon { width: 17px; height: 17px; }
-  .hw-pair-row { height: 160px; }
-  .hw-jelly-posters { height: 110px; }
 }
 
-/* ── Home widgets ───────────────────────────────────── */
-.widget-grid { padding: 0 0 var(--space-4xl); }
+/* ═══════════════════════════════════════════════════════
+   HOME WIDGET GRID + SHELL
 
-.hw-section-label {
-  font-size: var(--text-2xs); font-weight: 500; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--text-muted-warm);
-  padding: 1.375rem var(--space-xl) var(--space-md);
-}
+   One wrapping flex grid holds every Home widget:
+   1 column below 600px, 2 from 600px, 3 from 1024px.
+   600px is reused from .device-card / .jelly-card so no new
+   layout boundary appears; 1024px puts tablet-portrait (768)
+   at two columns and tablet-landscape at three.
 
-/* ── Smart Home device widget ───────────────────────── */
-/* reuses .devices-grid and .device-card */
-
-/* ── Side-by-side row (Jellyfin + Weather) ──────────── */
-.hw-pair-row {
+   Three iOS 9.3 constraints shape this block:
+     - no `gap` (iOS 14.1) and no CSS Grid (iOS 10.3), so
+       gutters are uniform per-card margins;
+     - the `> * + *` sibling-margin idiom used elsewhere in
+       this file is WRONG for a wrapping grid — the first
+       card of every wrapped row would lose its gutter;
+     - no var() inside calc() (buggy in Safari 9.1-11), so
+       the 0.75rem below is a literal and is exactly 2x the
+       card margin. Change one and you must change the other,
+       or rows wrap early once the text-size lever scales the
+       margin.
+   ═══════════════════════════════════════════════════════ */
+.w-grid {
   display: -webkit-box; display: -webkit-flex; display: flex;
-  padding: 0 var(--space-base);
-  margin-bottom: var(--space-2xs);
-  height: 220px;
-}
-.hw-pair-row > * + * { margin-left: var(--space-sm); }
-.hw-pair-col {
-  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
-  min-width: 0;
+  -webkit-flex-wrap: wrap; flex-wrap: wrap;
+  -webkit-box-align: stretch; -webkit-align-items: stretch; align-items: stretch;
+  padding: 0 var(--space-md);
 }
 
-/* ── Jellyfin widget ────────────────────────────────── */
-.hw-jelly-card {
+.w-card {
+  width: calc(100% - 0.75rem);   /* 0.75rem == 2x the margin below */
+  margin: 0.375rem;
+  min-height: 9.5rem;            /* a floor, never a fixed height */
   border-radius: var(--radius-xl);
   background: var(--surface);
   border: 1px solid var(--border);
   overflow: hidden;
-  cursor: pointer;
-  height: 100%;
+  min-width: 0;
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
   -webkit-tap-highlight-color: transparent;
   -webkit-transition: opacity 0.12s; transition: opacity 0.12s;
 }
-.hw-jelly-card:active { opacity: 0.7; }
+/* Media overrides come AFTER the base rule: same specificity, so
+   source order is what decides. */
+@media (min-width: 600px)  { .w-card { width: calc(50% - 0.75rem); } }
+@media (min-width: 1024px) { .w-card { width: calc(33.3333% - 0.75rem); } }
 
+/* span 2: full width until there are three columns to split, so a
+   wide card plus a normal one fills a three-column row exactly. */
+.w-card--wide { width: calc(100% - 0.75rem); }
+@media (min-width: 1024px) { .w-card--wide { width: calc(66.6667% - 0.75rem); } }
+
+.w-card--tap { cursor: pointer; }
+.w-card--tap:active { opacity: 0.7; }
+
+/* ── shell: header / body / footer ──────────────────── */
+.w-head {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  padding: var(--space-base) var(--space-lg) var(--space-sm);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  min-width: 0;
+}
+.w-head-icon {
+  color: var(--accent); line-height: 0;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.w-title {
+  font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary-light);
+  margin-left: 0.4375rem; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* spacer keeps the status pinned right without justify-content, so a
+   long title truncates instead of shoving the status off the card */
+.w-head-spacer { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; }
+.w-status {
+  font-size: var(--text-2xs); color: var(--text-faint-light);
+  white-space: nowrap; margin-left: var(--space-sm);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.w-head-btn {
+  width: 26px; height: 26px; min-width: 26px; margin-left: var(--space-sm);
+  border-radius: var(--radius-sm); border: 1px solid var(--border-accent);
+  background: var(--surface-raised); color: var(--text-muted-accent);
+  font-size: var(--text-md); line-height: 1; padding: 0;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.w-head-btn:active { opacity: 0.65; }
+.w-head-btn.is-busy { opacity: 0.45; pointer-events: none; }
+
+.w-body {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  padding: 0 var(--space-lg) var(--space-base);
+  min-width: 0; min-height: 0;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+}
+/* a body that carries its own edge-to-edge content (poster strips,
+   nested device grids) opts out of the side padding */
+.w-body--flush { padding-left: 0; padding-right: 0; }
+
+/* ── loading / empty / error, all keeping the footprint ─ */
+.w-msg {
+  font-size: var(--text-xs); color: var(--text-faint-warm);
+  text-align: center; padding: var(--space-lg) 0;
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+}
+.w-msg-retry {
+  margin-top: var(--space-sm);
+  background: none; border: none; padding: 0;
+  color: var(--accent); font-size: var(--text-xs); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── widget body primitives ──────────────────────────
+   Shared by every widget so the cards read as one system: a row list, a
+   labelled usage bar, and a state pill. Semantic colour (ok / warn /
+   crit) is deliberately separate from the indigo accent — the accent
+   marks identity, these mark condition. */
+.w-rows {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  min-width: 0;
+}
+.w-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  padding: var(--space-2xs) 0;
+  min-width: 0;
+}
+.w-row + .w-row { border-top: 1px solid var(--border); }
+.w-row-main { min-width: 0; -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; }
+.w-row-name {
+  font-size: var(--text-sm); color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.w-row-sub {
+  font-size: var(--text-2xs); color: var(--text-faint-light);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 0.0625rem;
+}
+.w-row-side {
+  text-align: right; margin-left: var(--space-sm);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.w-row-value {
+  font-size: var(--text-sm); color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* labelled usage bar: LABEL [====----] 42% */
+.w-metric {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  padding: 0.125rem 0;
+}
+.w-metric-label {
+  font-size: var(--text-3xs); font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-faint-light);
+  width: 2.5rem;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.w-bar {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  height: 0.375rem;
+  background: var(--surface-accent);
+  border-radius: 0.1875rem;
+  overflow: hidden;
+  min-width: 0;
+}
+.w-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0.1875rem;
+  -webkit-transition: width 0.3s; transition: width 0.3s;
+}
+.w-bar-fill.warn { background: var(--warn); }
+.w-bar-fill.crit { background: var(--err); }
+.w-metric-value {
+  font-size: var(--text-xs); color: var(--text-secondary);
+  width: 2.75rem; text-align: right;
+  margin-left: var(--space-sm);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+
+/* state pill — direction, health, anything with a good/bad reading */
+.w-pill {
+  display: inline-block;
+  font-size: var(--text-2xs); font-weight: 500;
+  padding: 0.0625rem 0.3125rem;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+.w-pill.up   { color: var(--ok);  background: rgba(61, 220, 132, 0.12); }
+.w-pill.down { color: var(--err); background: rgba(255, 95, 87, 0.12); }
+.w-pill.flat { color: var(--text-muted); background: var(--surface-accent); }
+
+/* status dot, reused by any widget reporting up/down */
+.w-dot {
+  display: inline-block;
+  width: 0.375rem; height: 0.375rem;
+  border-radius: 50%;
+  margin-right: var(--space-xs);
+  background: var(--text-faint);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.w-dot.ok   { background: var(--ok); }
+.w-dot.err  { background: var(--err); }
+
+
+/* ── Jellyfin widget ────────────────────────────────── */
+/* The strip absorbs the card's spare height, so a Jellyfin card sitting
+   next to a taller neighbour grows its posters rather than leaving a
+   gap. min-height keeps the artwork readable in the other direction. */
 .hw-jelly-posters {
   display: -webkit-box; display: -webkit-flex; display: flex;
-  height: 170px;
+  min-height: 6.5rem;
   overflow: hidden;
   -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
 }
+.hw-jelly-foot {
+  padding: var(--space-sm) var(--space-lg) 0;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  min-width: 0;
+}
+.hw-jelly-counts {
+  font-size: var(--text-2xs); color: var(--text-faint-light);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hw-jelly-now {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  margin-top: var(--space-2xs);
+  min-width: 0;
+}
+.hw-jelly-now-text {
+  font-size: var(--text-2xs); color: var(--text-secondary-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
+}
+.hw-jelly-latest { color: var(--text-faint-warm); margin-top: var(--space-2xs); }
 .hw-jelly-poster {
   -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
   background: var(--surface) center no-repeat;
@@ -990,54 +1445,34 @@ html, body {
   font-size: var(--text-2xs); color: var(--text-secondary-light); text-align: center;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.hw-jelly-meta {
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
-  padding: var(--space-sm) var(--space-md);
+/* ── Proxmox widget ─────────────────────────────────── */
+.px-w-node + .px-w-node {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
 }
-.hw-jelly-meta-left {
+.px-w-node-head {
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  margin-bottom: var(--space-2xs);
   min-width: 0;
 }
-.hw-jelly-meta-left > * + * { margin-left: 0.3125rem; }
-.hw-jelly-icon  { font-size: var(--text-base); color: var(--accent); -webkit-flex-shrink: 0; flex-shrink: 0; }
-.hw-jelly-title { font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hw-jelly-counts { font-size: var(--text-2xs); color: var(--text-faint-light); white-space: nowrap; }
-.hw-jelly-arrow { font-size: var(--text-md); color: var(--text-faint-deep); -webkit-flex-shrink: 0; flex-shrink: 0; }
-
-/* ── Weather widget ─────────────────────────────────── */
-.hw-wx-card {
-  border-radius: var(--radius-xl);
-  background: radial-gradient(circle at 85% 15%, rgba(160,160,255,0.13) 0%, rgba(160,160,255,0) 55%), var(--surface);
-  border: 1px solid var(--border);
-  overflow: hidden;
-  cursor: pointer;
-  height: 100%;
-  box-sizing: border-box;
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
-  padding: var(--space-md) 0.6875rem var(--space-md) var(--space-md);
-  -webkit-tap-highlight-color: transparent;
-  -webkit-transition: opacity 0.12s; transition: opacity 0.12s;
+.px-w-node-name {
+  font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.hw-wx-card:active { opacity: 0.7; }
-
-/* top bar: pin icon + location name, right-aligned */
-.hw-wx-topbar {
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  -webkit-box-pack: end; -webkit-justify-content: flex-end; justify-content: flex-end;
-  margin-bottom: var(--space-2xs);
+.px-w-node-up {
+  font-size: var(--text-2xs); color: var(--text-faint-light);
+  margin-left: var(--space-sm); white-space: nowrap;
   -webkit-flex-shrink: 0; flex-shrink: 0;
 }
-.hw-wx-topbar > * + * { margin-left: 0.1875rem; }
-.hw-wx-pin { font-size: var(--text-2xs); color: var(--accent); -webkit-flex-shrink: 0; flex-shrink: 0; }
-.hw-wx-loc {
-  font-size: var(--text-2xs); color: var(--text-muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  max-width: 90%;
+
+/* ── Weather widget ─────────────────────────────────── */
+/* The card keeps its own light source; the shell supplies the rest
+   of the chrome. Layered background: the gradient sits over the
+   normal surface colour so the card still matches its neighbours. */
+.w-card--wx {
+  background: radial-gradient(circle at 85% 15%, rgba(160,160,255,0.13) 0%, rgba(160,160,255,0) 55%), var(--surface);
 }
 
 /* main row: fills remaining vertical space */
@@ -1073,51 +1508,96 @@ html, body {
 .hw-wx-range-col > * + * { margin-top: 0.1875rem; }
 .hw-wx-range-max { font-size: var(--text-sm); font-weight: 500; color: var(--text-primary-cool); }
 .hw-wx-range-min { font-size: var(--text-xs); color: var(--text-faint-warm); }
-/* humidity pushed to far right */
-.hw-wx-humidity-col {
-  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
-  -webkit-box-align: end; -webkit-align-items: flex-end; align-items: flex-end;
-  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+/* conditions, right of the temperature */
+.hw-wx-cond-col { text-align: right; min-width: 0; -webkit-flex-shrink: 1; flex-shrink: 1; }
+.hw-wx-cond {
+  font-size: var(--text-sm); color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.hw-wx-humidity-col > * + * { margin-top: var(--space-3xs); }
-.hw-wx-hum-label { font-size: var(--text-2xs); color: var(--text-faint-warm); text-transform: uppercase; letter-spacing: 0.05em; }
-.hw-wx-hum-val   { font-size: var(--text-md); color: var(--text-muted-accent); font-weight: 500; }
+.hw-wx-cond-sub {
+  font-size: var(--text-2xs); color: var(--text-faint-light);
+  margin-top: 0.0625rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
-.hw-wx-na { font-size: var(--text-xs); color: var(--text-faint-warm); text-align: center; width: 100%; padding: var(--space-sm) 0; }
+/* ── hourly strip ───────────────────────────────────
+   Six equal columns. No gap and no grid: each column is a sixth of the
+   row and carries its own inner padding, which also keeps the columns
+   from touching when the text-size lever grows the labels. */
+.hw-wx-hours {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  margin-top: var(--space-sm);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.hw-wx-hour {
+  width: 16.6667%;
+  padding: 0 0.125rem;
+  text-align: center;
+  min-width: 0;
+}
+.hw-wx-hour-label {
+  font-size: var(--text-3xs); color: var(--text-faint-light);
+  font-variant-numeric: tabular-nums;
+}
+.hw-wx-hour-icon { line-height: 0; margin: 0.125rem 0; }
+.hw-wx-hour-icon svg { display: inline-block; }
+.hw-wx-hour-temp {
+  font-size: var(--text-2xs); color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+/* Precipitation probability as a column, drawn bottom-up. */
+.hw-wx-hour-bar {
+  height: 1.25rem;
+  margin: 0.1875rem auto 0;
+  width: 0.25rem;
+  border-radius: 0.125rem;
+  background: var(--surface-accent);
+  position: relative;
+  overflow: hidden;
+}
+.hw-wx-hour-bar-fill {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: var(--info);
+  border-radius: 0.125rem;
+}
+
+/* ── three-day outlook ──────────────────────────────── */
+.hw-wx-days {
+  margin-top: var(--space-sm);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.hw-wx-day {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  padding: 0.1875rem 0;
+  min-width: 0;
+}
+.hw-wx-day + .hw-wx-day { border-top: 1px solid var(--border); }
+.hw-wx-day-name {
+  font-size: var(--text-2xs); color: var(--text-secondary-soft);
+  width: 2.25rem;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.hw-wx-day-icon { line-height: 0; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.hw-wx-day-precip {
+  font-size: var(--text-3xs); color: var(--info);
+  margin-left: var(--space-xs); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.hw-wx-day-max {
+  font-size: var(--text-2xs); color: var(--text-primary-cool);
+  font-variant-numeric: tabular-nums;
+}
+.hw-wx-day-min {
+  font-size: var(--text-2xs); color: var(--text-faint-warm);
+  margin-left: var(--space-sm); width: 1.75rem; text-align: right;
+  font-variant-numeric: tabular-nums;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
 /* ── Weather icon SVG (used in tab too) ─────────────── */
 /* icons are inline SVG injected by JS — these rules style them */
 .wx-icon { display: inline-block; vertical-align: middle; }
 .wx-icon svg { display: block; }
-
-/* ── Weather tab: icon in day rows ─────────────────── */
-.weather-day-row { position: relative; }
-.weather-day-icon {
-  width: 22px; height: 22px; margin-right: var(--space-sm);
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
-  -webkit-flex-shrink: 0; flex-shrink: 0;
-}
-.weather-day-icon svg { width: 18px; height: 18px; }
-
-/* weather day card icon */
-.weather-day-card-icon {
-  margin-bottom: var(--space-xs);
-  display: -webkit-box; display: -webkit-flex; display: flex;
-}
-.weather-day-card-icon svg { width: 26px; height: 26px; }
-
-/* precip badge in day rows */
-.weather-day-precip {
-  font-size: var(--text-2xs); color: #7a7aaa;
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  margin-left: var(--space-2xs);
-}
-.weather-day-precip > * + * { margin-left: var(--space-3xs); }
-.weather-day-precip svg { width: 9px; height: 9px; }
 
 /* ── Utilities ──────────────────────────────────────── */
 .hidden { display: none !important; }
@@ -2032,24 +2512,6 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
   padding: var(--space-lg) 0 2rem;
 }
 
-/* ── Glance row (Jelly + Weather side-by-side) ──────── */
-.home-glance-row {
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  padding: 0 var(--space-lg);
-  margin-bottom: var(--space-base);
-  min-height: 0;
-}
-.home-glance-row > * + * { margin-left: var(--space-md); }
-/* each column inside the glance row */
-.home-glance-col {
-  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
-  min-width: 0;
-}
-/* If only one card is rendered, let it fill width */
-.home-glance-row.solo .home-glance-col {
-  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
-}
-
 /* ── Empty state ────────────────────────────────────── */
 .home-empty {
   display: none;
@@ -2064,57 +2526,6 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
 .home-empty-title   { font-size: var(--text-md); font-weight: 400; color: var(--text-faint-soft); margin-bottom: var(--space-xs); }
 .home-empty-desc    { font-size: var(--text-sm); color: var(--text-faint); line-height: 1.6; }
 
-/* ── Placeholder row (future widgets) ───────────────── */
-.home-placeholder-row {
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  padding: 0 var(--space-lg);
-  margin-bottom: var(--space-base);
-}
-.home-placeholder-row > * + * { margin-left: var(--space-md); }
-.home-placeholder-card {
-  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
-  background: var(--surface);
-  border: 1px dashed #1e1e2e;
-  border-radius: var(--radius-xl);
-  padding: var(--space-xl) var(--space-base);
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
-  -webkit-box-align: start; -webkit-align-items: flex-start; align-items: flex-start;
-  min-height: 90px;
-}
-.home-placeholder-card-icon { margin-bottom: var(--space-md); opacity: 0.5; }
-.home-placeholder-card-label {
-  font-size: var(--text-sm); font-weight: 500; color: var(--text-faint-deep);
-  margin-bottom: 0.1875rem; line-height: 1.2;
-}
-.home-placeholder-card-sub {
-  font-size: var(--text-2xs); color: var(--border-accent); letter-spacing: 0.04em;
-  text-transform: uppercase; font-weight: 500;
-}
-
-/* ── Section (Smart Home tiles on home) ─────────────── */
-.home-section { padding: 0 0 var(--space-2xs); }
-.home-section.hidden { display: none; }
-.home-section-header {
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
-  padding: var(--space-2xl) var(--space-2xl) var(--space-md);
-}
-.home-section-label {
-  font-size: var(--text-2xs); font-weight: 500; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--text-faint);
-  padding: 0;
-}
-.home-section-header .btn-icon-only {
-  width: 32px; height: 32px; min-width: 32px;
-  border-radius: var(--radius-sm); border: 1px solid var(--border-accent);
-  background: var(--surface-raised); color: var(--text-muted-accent); font-size: var(--text-xl); line-height: 1;
-  cursor: pointer; -webkit-tap-highlight-color: transparent;
-}
-.home-section-header .btn-icon-only:active { opacity: 0.65; }
-.home-section-header .btn-icon-only.is-busy { opacity: 0.45; pointer-events: none; }
-
 /* ── Smart Home tab refresh ───────────────────────── */
 #page-smarthome .page-content { padding-top: var(--space-xs); }
 .smarthome-top-actions {
@@ -2123,19 +2534,68 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
   -webkit-box-pack: end; -webkit-justify-content: flex-end; justify-content: flex-end;
 }
 .smarthome-top-actions .btn-icon-only {
-  width: 32px; height: 32px; min-width: 32px;
+  width: 32px; height: 32px; min-width: 32px; padding: 0;
   border-radius: var(--radius-sm); border: 1px solid var(--border-accent);
   background: var(--surface-raised); color: var(--text-muted-accent); font-size: var(--text-xl); line-height: 1;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
+  /* Centres the glyph on its own. This used to depend on a global
+     `line-height: 32px` that lived in the Weather section; the weather
+     refactor removed it, and a fixed line-height would not survive the
+     text-size lever anyway. */
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
 }
 .smarthome-top-actions .btn-icon-only:active { opacity: 0.65; }
 .smarthome-top-actions .btn-icon-only.is-busy { opacity: 0.45; pointer-events: none; }
 
-/* ── Widget grid (reuse existing device cards) ──────── */
-/* device cards in home use the existing .devices-grid + .device-card rules */
-/* just ensure the grid padding matches home layout */
-#home-smarthome-grid {
-  padding: 0 var(--space-md);
+/* ── Device tiles nested inside a widget ────────────
+   On the Smart Home tab .device-card is sized against the full page,
+   so it steps down to 12.5% at 1200px. Inside a widget the container
+   is a third or two thirds of that, and those page-level widths would
+   render slivers — so tiles nested in a .w-body get their own scale.
+   `.w-body .device-card` (0,2,0) outranks every page-level
+   `.device-card` rule regardless of source order; the overrides below
+   share its specificity, so among themselves order still decides.
+   0.5rem is 2x the tile's own margin, as on the tab. */
+.w-body .devices-grid { padding: 0 var(--space-sm); }
+.w-body .device-card {
+  width: calc(50% - 0.5rem);
+  min-height: 92px;
+  padding: var(--space-base) var(--space-md) var(--space-md);
+}
+@media (min-width: 600px)  { .w-body .device-card { width: calc(33.3333% - 0.5rem); } }
+@media (min-width: 1024px) { .w-body .device-card { width: calc(25% - 0.5rem); } }
+
+/* ── Short-viewport budget ───────────────────────────
+   Phone landscape leaves ~300px of content height — barely more than one
+   card at the normal floor, so widgets shed their optional rows and
+   tighten up rather than letting the first card eat the whole viewport.
+   (The fixed bars get the same treatment in the landscape query further
+   up.) This block sits at the END of the widget CSS on purpose: these
+   selectors match the base rules' specificity exactly, so it only wins
+   by being the last one declared. */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* The greeting block is the single biggest fixed cost on a 390px-tall
+     viewport — trimming it buys a whole widget row. */
+  .home-header { padding-top: var(--space-base); }
+  .home-header-top { padding-bottom: var(--space-md); }
+  .home-greeting { font-size: var(--text-xl); }
+  .home-content { padding-top: var(--space-sm); }
+
+  .w-optional { display: none; }
+  .w-card { min-height: 0; }
+  .w-head { padding-top: var(--space-sm); padding-bottom: var(--space-2xs); }
+  .w-body .device-card {
+    min-height: 0;
+    padding: var(--space-sm) var(--space-md);
+  }
+  .w-body .device-card .card-icon { font-size: var(--text-lg); }
+  .hw-jelly-posters { min-height: 4.5rem; }
+  .hw-wx-hour-bar { height: 0.75rem; }
+  /* Scoped to .w-body: the Smart Home *tab* keeps its own tile height,
+     so this Home-screen budget doesn't reach across to it. */
+  .w-body .light-card-split { min-height: 0; }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -2256,26 +2716,14 @@ html.light .home-header-top { border-bottom-color: #d8d8e2; }
 html.light .home-greeting { color: #14141c; }
 html.light .home-date     { color: #9090a8; }
 
-/* Home placeholder cards */
-html.light .home-placeholder-card {
-  background: #e8e8f0;
-  border-color: #c8c8d8;
-}
-html.light .home-placeholder-card-label { color: #9090a8; }
-html.light .home-placeholder-card-sub   { color: #b0b0c0; }
-html.light .home-placeholder-card-icon  { opacity: 0.4; }
-
 /* Home empty */
 html.light .home-empty-title { color: #9090a8; }
 html.light .home-empty-desc  { color: #b0b0c0; }
 
 /* Section labels */
-html.light .home-section-label { color: #8080a0; }
-html.light .home-section-header .btn-icon-only,
 html.light .smarthome-top-actions .btn-icon-only {
   background: #f0f0f6; border-color: #d0d0da; color: #505068;
 }
-html.light .hw-section-label   { color: #8080a0; }
 
 /* Device cards */
 html.light .device-card {
@@ -2293,67 +2741,160 @@ html.light .device-card.on .card-icon  { color: #a0a0ff; }
 html.light .device-card.on .card-name  { color: #e0e0f8; }
 html.light .device-card.on .card-state { color: #8080d0; }
 
-/* Jellyfin widget card */
-html.light .hw-jelly-card {
+/* Home widget shell.
+   The light theme is a set of explicit overrides, not token
+   redefinitions, so every new widget class needs its rule here. */
+html.light .w-card {
   background: #e2e2ea;
   border-color: #c8c8d4;
 }
-html.light .hw-jelly-poster     { background-color: #ccccda; }
-html.light .hw-jelly-poster-fallback { color: #9090a8; }
-html.light .hw-jelly-title      { color: #28283a; }
-html.light .hw-jelly-counts     { color: #9090a8; }
-html.light .hw-jelly-arrow      { color: #c0c0d0; }
-
-/* Weather widget card */
-html.light .hw-wx-card {
-  background: #e4e4f0;
+html.light .w-card--wx {
+  background: radial-gradient(circle at 85% 15%, rgba(96,96,204,0.10) 0%, rgba(96,96,204,0) 55%), #e4e4f0;
   border-color: #c8c8d8;
 }
+html.light .w-head-icon { color: #6060cc; }
+html.light .w-title     { color: #28283a; }
+html.light .w-status    { color: #9090a8; }
+html.light .w-head-btn {
+  background: #d8d8e4;
+  border-color: #c0c0d0;
+  color: #5a5a80;
+}
+html.light .w-msg       { color: #a0a0b8; }
+html.light .w-msg-retry { color: #4040cc; }
+
+/* Widget body primitives */
+html.light .w-row + .w-row  { border-top-color: #d0d0dc; }
+html.light .w-row-name      { color: #28283a; }
+html.light .w-row-sub       { color: #9090a8; }
+html.light .w-row-value     { color: #14141c; }
+html.light .w-metric-label  { color: #9090a8; }
+html.light .w-metric-value  { color: #4a4a5e; }
+html.light .w-bar           { background: #ccccda; }
+html.light .w-bar-fill      { background: #5050b0; }
+html.light .w-bar-fill.warn { background: #b8790a; }
+html.light .w-bar-fill.crit { background: #d04038; }
+html.light .w-pill.up       { color: #1c7a4c; background: rgba(28, 122, 76, 0.12); }
+html.light .w-pill.down     { color: #b8322b; background: rgba(184, 50, 43, 0.12); }
+html.light .w-pill.flat     { color: #7878a0; background: #d4d4e0; }
+html.light .w-dot           { background: #b0b0c0; }
+html.light .w-dot.ok        { background: #1c7a4c; }
+html.light .w-dot.err       { background: #d04038; }
+
+/* Jellyfin widget.
+   The fallback is an opaque overlay sitting on top of the poster, so it
+   needs its own light background — overriding only its colour left a
+   dark block covering the whole poster strip in the light theme. */
+html.light .hw-jelly-poster     { background-color: #ccccda; }
+html.light .hw-jelly-poster-fallback {
+  color: #9090a8;
+  background: #d6d6e2;
+}
+html.light .hw-jelly-counts     { color: #9090a8; }
+html.light .hw-jelly-now-text   { color: #4a4a5e; }
+html.light .hw-jelly-latest     { color: #9090a8; }
+
+/* Proxmox widget */
+html.light .px-w-node + .px-w-node { border-top-color: #d0d0dc; }
+html.light .px-w-node-name  { color: #28283a; }
+html.light .px-w-node-up    { color: #9090a8; }
+
+/* Weather widget */
 html.light .hw-wx-temp      { color: #14141c; }
 html.light .hw-wx-range-max { color: #28283a; }
 html.light .hw-wx-range-min { color: #a0a0b8; }
-html.light .hw-wx-hum-label { color: #a0a0b8; }
-html.light .hw-wx-hum-val   { color: #5050b0; }
-html.light .hw-wx-loc       { color: #9090a8; }
-html.light .hw-wx-pin       { color: #6060cc; }
-html.light .hw-wx-na        { color: #a0a0b8; }
+html.light .hw-wx-cond      { color: #28283a; }
+html.light .hw-wx-cond-sub  { color: #9090a8; }
+html.light .hw-wx-hour-label { color: #9090a8; }
+html.light .hw-wx-hour-temp  { color: #3a3a4e; }
+html.light .hw-wx-hour-bar   { background: #ccccda; }
+html.light .hw-wx-hour-bar-fill { background: #3d84d6; }
+html.light .hw-wx-day + .hw-wx-day { border-top-color: #d0d0dc; }
+html.light .hw-wx-day-name   { color: #4a4a5e; }
+html.light .hw-wx-day-precip { color: #3d84d6; }
+html.light .hw-wx-day-max    { color: #14141c; }
+html.light .hw-wx-day-min    { color: #a0a0b8; }
 
-/* Weather page */
-html.light .weather-now-card {
-  background: #e4e4f2;
-  border-color: #c8c8dc;
+/* ── Weather tab ──────────────────────────────────────
+   The light theme here is explicit overrides, not token
+   redefinitions, so every class in the weather section needs a
+   rule below or it keeps its dark value on a light ground. */
+html.light .wx-icon-btn {
+  background: #dcdce8;
+  border-color: #c0c0d0;
+  color: #3a3a52;
 }
-html.light .weather-now-city { color: #505068; }
-html.light .weather-now-temp { color: #12121a; }
-html.light .weather-now-desc { color: #50506c; }
-html.light .weather-now-line { color: #7878a0; }
-html.light .weather-now-line strong { color: #1a1a28; }
-html.light .weather-day-card {
-  background: #e4e4f0;
-  border-color: #c8c8dc;
-}
-html.light .weather-day-label { color: #8888a4; }
-html.light .weather-day-temp span { color: #1a1a28; }
-html.light .weather-day-temp small { color: #9090a8; }
-html.light .weather-day-desc { color: #585872; }
-html.light .weather-chart {
-  background: #e0e0e8;
-  border-color: #c8c8d8;
-}
-html.light .weather-days-list {
+html.light .wx-icon-btn.is-active { border-color: #6060cc; color: #3030b0; }
+html.light .wx-search-panel {
   background: #e4e4ec;
   border-color: #c8c8d8;
 }
-html.light .weather-day-row { border-bottom-color: #d0d0da; }
-html.light .weather-day-name { color: #22222e; }
-html.light .weather-day-summary { color: #686888; }
-html.light .weather-day-range { color: #14141c; }
-html.light .btn-secondary {
+html.light .wx-section-title { color: #8080a0; }
+html.light .wx-daybar-today  { color: #3030b0; }
+html.light .wx-daybar-date   { color: #14141c; }
+html.light .wx-daybar-back {
   background: #dcdce8;
-  border-color: #c0c0d0;
-  color: #28283a;
+  border-color: #7070c8;
+  color: #3030b0;
 }
-html.light .weather-top-actions .btn-icon-only {
+
+html.light .wx-hero {
+  background: radial-gradient(circle at 82% 12%, rgba(96,96,204,0.12) 0%, rgba(96,96,204,0) 52%), #e4e4f2;
+  border-color: #c8c8dc;
+}
+html.light .wx-hero.is-night {
+  background: radial-gradient(circle at 82% 12%, rgba(70,70,150,0.14) 0%, rgba(70,70,150,0) 52%), #dedee8;
+}
+html.light .wx-hero-loc      { color: #505068; }
+html.light .wx-hero-updated  { color: #9090a8; }
+html.light .wx-hero-temp     { color: #12121a; }
+html.light .wx-hero-cond     { color: #3a3a52; }
+html.light .wx-hero-feels    { color: #8080a0; }
+html.light .wx-hero-range-hi { color: #1a1a28; }
+html.light .wx-hero-range-lo { color: #9090a8; }
+
+html.light .wx-hours-scroll {
+  background: #e4e4ec;
+  border-color: #c8c8d8;
+}
+html.light .wx-hour-label  { color: #8080a0; }
+html.light .wx-hour.is-now .wx-hour-label { color: #3030b0; }
+html.light .wx-hour-temp   { color: #1a1a28; }
+html.light .wx-hour-precip { color: #3d84d6; }
+html.light .wx-hour-band   { background: #ccccda; }
+html.light .wx-hour.is-day .wx-hour-band { background: rgba(214, 168, 20, 0.45); }
+
+html.light .wx-metric {
+  background: #e4e4ec;
+  border-color: #c8c8d8;
+}
+html.light .wx-metric-label { color: #8080a0; }
+html.light .wx-metric-value { color: #14141c; }
+html.light .wx-metric-sub   { color: #9090a8; }
+html.light .wx-scale-marker { background: #14141c; border-color: #e4e4ec; }
+html.light .wx-arc          { background: #ccccda; }
+html.light .wx-arc-marker   { border-color: #e4e4ec; }
+html.light .wx-arc-ends     { color: #9090a8; }
+
+html.light .wx-day {
+  background: #e4e4ec;
+  border-color: #c8c8d8;
+}
+html.light .wx-day.is-today       { border-color: #7070c8; }
+/* Same ordering contract as the dark rules: selection after today. */
+html.light .wx-day.is-selected {
+  border-color: #4040cc;
+  background: #dcdcf4;
+}
+html.light .wx-day-name           { color: #22222e; }
+html.light .wx-day.is-today .wx-day-name { color: #3030b0; }
+html.light .wx-day-precip         { color: #3d84d6; }
+html.light .wx-day-lo             { color: #9090a8; }
+html.light .wx-day-hi             { color: #14141c; }
+html.light .wx-day-bar            { background: #ccccda; }
+html.light .wx-day-bar-now        { background: #14141c; border-color: #e4e4ec; }
+
+html.light .btn-secondary {
   background: #dcdce8;
   border-color: #c0c0d0;
   color: #28283a;
@@ -2561,10 +3102,6 @@ html.light .sheet-colorwheel-header { color: #50506a; }
 /* Chartist overrides for light theme */
 html.light .ct-grid { stroke: rgba(0,0,0,0.08); }
 html.light .ct-label { fill: #7878a0 !important; color: #7878a0 !important; }
-html.light .weather-chart .ct-series-a .ct-line,
-html.light .weather-chart .ct-series-a .ct-point { stroke: #4040b0; }
-html.light .weather-chart .ct-series-b .ct-line,
-html.light .weather-chart .ct-series-b .ct-point { stroke: #8080b0; }
 
 /* Jelly grid cards */
 html.light .jelly-card {
