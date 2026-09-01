@@ -25,8 +25,8 @@ Custom properties **cannot** appear in `@media` conditions (`@media (min-width: 
 ## Commands
 
 ```bash
-npm run dev                  # nodemon on :3000 (backend also serves frontend/ statically)
-npm start                    # plain node
+npm run dev                  # nodemon on :3000 — nodemon is NOT a project dep, install it yourself
+npm start                    # plain node on :3000 (backend also serves frontend/ statically)
 
 npm test                     # jest: backend + frontend unit tests
 npm run test:backend         # supertest against the express routes

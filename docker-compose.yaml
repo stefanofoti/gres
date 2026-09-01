@@ -1,23 +1,51 @@
-# Usage: docker compose up -d
+# gres — production compose file.
+#
+#   docker compose up -d
+#
+# Everything below works as-is. Create a .env file next to this one only
+# if you want to change the defaults (see .env.example, or the README).
 
 services:
 
   gres:
-    build: 
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/stefanofoti/gres:latest
     container_name: gres
-    deploy:
-      replicas: 1
-    volumes:
-      - gres_data:/app/data
     restart: unless-stopped
+
     ports:
-      - "3000:3000"
+      # host:container — change only the left-hand number to serve gres
+      # on a different port, e.g. "8080:3000".
+      - "${PORT:-3000}:3000"
+
+    volumes:
+      # Your settings and the weather cache. Keep this, or every
+      # integration has to be reconfigured on the next update.
+      - gres_data:/app/data
+
     environment:
       NODE_ENV: production
       PORT: 3000
+
+      # error | warn | info | debug
       LOG_LEVEL: ${LOG_LEVEL:-warn}
+
+      # How often the Smart Home tab polls Home Assistant, in seconds.
+      # 0 disables polling entirely.
+      HA_REFRESH_INTERVAL_SEC: ${HA_REFRESH_INTERVAL_SEC:-15}
+
+      # Optional numeric PIN gates. Leave unset and the Settings tab and
+      # every device open freely; set one and gres asks for it. The PIN
+      # never reaches the browser — only whether a guess matched.
+      SETTINGS_PIN: ${SETTINGS_PIN:-}
+      DEVICES_PIN: ${DEVICES_PIN:-}
+
+    # If gres cannot reach api.open-meteo.com or finance.yahoo.com while
+    # your other containers are fine, your Docker DNS is likely the
+    # culprit — uncomment these.
+    #dns:
+    #  - 8.8.8.8
+    #  - 1.1.1.1
+
     networks:
       - gres-network
 

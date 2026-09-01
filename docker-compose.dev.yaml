@@ -1,0 +1,42 @@
+# gres — development compose file.
+#
+#   docker compose -f docker-compose.dev.yaml up -d --build
+#
+# Builds the image from this checkout instead of pulling it from GHCR.
+# Use this when you are changing the code; for just running gres, use
+# docker-compose.yaml.
+
+services:
+
+  gres:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gres-dev
+    restart: unless-stopped
+
+    ports:
+      - "${PORT:-3000}:3000"
+
+    volumes:
+      - gres_dev_data:/app/data
+
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      HA_REFRESH_INTERVAL_SEC: ${HA_REFRESH_INTERVAL_SEC:-15}
+      SETTINGS_PIN: ${SETTINGS_PIN:-}
+      DEVICES_PIN: ${DEVICES_PIN:-}
+
+    networks:
+      - gres-network
+
+networks:
+  gres-network:
+    driver: bridge
+
+volumes:
+  # A separate volume from the production one, so experimenting here
+  # cannot corrupt real settings.
+  gres_dev_data:
