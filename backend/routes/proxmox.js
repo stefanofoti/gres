@@ -15,6 +15,7 @@
  *
  * Endpoints:
  *   GET  /api/px/status                          — PVE version / connectivity
+ *   GET  /api/px/home-summary                    — cluster roll-up for the Home widget
  *   GET  /api/px/nodes                           — cluster node list
  *   GET  /api/px/nodes/:node/status              — node hardware stats
  *   POST /api/px/nodes/:node/power               — shutdown | reboot node
@@ -156,6 +157,121 @@ router.get('/status', function (req, res) {
     }
     req.log.info({ version: data.version }, 'Proxmox connection OK');
     res.json({ connected: true, version: data.version, release: data.release });
+  });
+});
+
+/* ── Home widget summary ────────────────────────────────── */
+
+/* The Home widget polls this on a wall panel that never sleeps, and one
+   call fans out to 1 + 2N upstream requests. A short cache keeps that
+   off PVE without making the card feel stale — the numbers it shows
+   (usage percentages, running counts) don't move meaningfully faster. */
+var summaryCache = { at: 0, key: '', body: null };
+var SUMMARY_TTL_MS = 15000;
+
+/* Keyed on the credentials, so saving a new server in Settings shows the
+   new cluster immediately instead of up to 15s of the old one. */
+function summaryKey(cfg) { return cfg.url + '|' + cfg.tokenId; }
+
+/**
+ * GET /api/px/home-summary
+ *
+ * One request for everything the Home widget needs: per-node CPU, memory
+ * and storage, plus a cluster-wide running/stopped VM count. Raw byte
+ * totals are passed through rather than pre-divided percentages, so the
+ * widget can render both the bar and the underlying figure.
+ *
+ * A node that fails to enumerate its guests still appears, with its
+ * hardware stats and a null VM count — a single unreachable node must
+ * not blank the whole card.
+ */
+router.get('/home-summary', function (req, res) {
+  var cfg = getPXConfig();
+  if (!cfg.url || !cfg.token) {
+    return res.status(400).json({ error: 'Proxmox non configurato' });
+  }
+
+  var key = summaryKey(cfg);
+  if (summaryCache.body && summaryCache.key === key &&
+      (Date.now() - summaryCache.at) < SUMMARY_TTL_MS) {
+    req.log.debug('serving cached Proxmox home summary');
+    return res.json(summaryCache.body);
+  }
+
+  pxRequest(cfg, 'GET', '/nodes', null, function (err, nodes) {
+    if (err) {
+      req.log.warn({ err: err }, 'Proxmox home summary: node list failed');
+      return res.status(502).json({ error: err });
+    }
+    if (!Array.isArray(nodes)) nodes = [];
+
+    var out = {
+      nodes:  [],
+      totals: { nodes: nodes.length, online: 0, vmsRunning: 0, vmsStopped: 0 }
+    };
+
+    if (!nodes.length) {
+      summaryCache = { at: Date.now(), key: key, body: out };
+      return res.json(out);
+    }
+
+    /* Two guest requests per node, all in flight at once; `pending`
+       reaches zero only after every one has reported. */
+    var pending = nodes.length * 2;
+    var entries = [];
+
+    function finish() {
+      if (--pending > 0) return;
+
+      /* PVE returns nodes in cluster order, which is stable; keep it so
+         the widget's rows don't reshuffle between polls. */
+      out.nodes = entries;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].status === 'online') out.totals.online++;
+        out.totals.vmsRunning += entries[i].vmsRunning || 0;
+        out.totals.vmsStopped += entries[i].vmsStopped || 0;
+      }
+      summaryCache = { at: Date.now(), key: key, body: out };
+      req.log.info({ nodes: out.totals.nodes, running: out.totals.vmsRunning },
+        'Proxmox home summary returned');
+      res.json(out);
+    }
+
+    function countGuests(entry, type) {
+      pxRequest(cfg, 'GET', '/nodes/' + entry.node + '/' + type, null,
+        function (gErr, guests) {
+          if (!gErr && Array.isArray(guests)) {
+            for (var g = 0; g < guests.length; g++) {
+              if (guests[g].status === 'running') entry.vmsRunning++;
+              else entry.vmsStopped++;
+            }
+          } else if (gErr) {
+            req.log.warn({ err: gErr, node: entry.node, type: type },
+              'Proxmox home summary: guest list failed');
+          }
+          finish();
+        });
+    }
+
+    for (var n = 0; n < nodes.length; n++) {
+      var node = nodes[n];
+      var entry = {
+        node:       node.node,
+        status:     node.status || 'unknown',
+        uptime:     node.uptime  != null ? node.uptime  : null,
+        cpu:        node.cpu     != null ? node.cpu     : null,   /* 0..1 */
+        maxcpu:     node.maxcpu  != null ? node.maxcpu  : null,
+        mem:        node.mem     != null ? node.mem     : null,   /* bytes */
+        maxmem:     node.maxmem  != null ? node.maxmem  : null,
+        disk:       node.disk    != null ? node.disk    : null,   /* bytes */
+        maxdisk:    node.maxdisk != null ? node.maxdisk : null,
+        vmsRunning: 0,
+        vmsStopped: 0
+      };
+      entries.push(entry);
+      countGuests(entry, 'qemu');
+      countGuests(entry, 'lxc');
+    }
   });
 });
 

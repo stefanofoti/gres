@@ -144,3 +144,118 @@ describe('POST /api/px/nodes/:node/power', function () {
     return request(app).post('/api/px/nodes/pve1/power').send({ command: 'reboot' }).expect(500);
   });
 });
+
+describe('GET /api/px/home-summary', function () {
+  /* Path-aware stand-in: home-summary fans out to /nodes and then to
+     /nodes/<n>/qemu and /nodes/<n>/lxc for every node at once. */
+  function clusterHandler(routes) {
+    return function (req, res) {
+      var chunks = [];
+      req.on('data', function (c) { chunks.push(c); });
+      req.on('end', function () {
+        var apiPath = req.url.replace('/api2/json', '');
+        var hit = routes[apiPath];
+        if (hit === undefined) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ message: 'unexpected path ' + apiPath }));
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ data: hit }));
+      });
+    };
+  }
+
+  test('400 when Proxmox is not configured, without contacting any server', function () {
+    var app = buildApp();
+    return request(app).get('/api/px/home-summary').expect(400).then(function (res) {
+      expect(res.body.error).toBeTruthy();
+    });
+  });
+
+  test('rolls node hardware stats and guest counts into one payload', function () {
+    writePXConfig();
+    currentHandler = clusterHandler({
+      '/nodes': [{
+        node: 'pve1', status: 'online', uptime: 1893622,
+        cpu: 0.07, maxcpu: 8,
+        mem: 12884901888, maxmem: 34359738368,
+        disk: 41231686041, maxdisk: 100000000000
+      }],
+      '/nodes/pve1/qemu': [
+        { vmid: 100, status: 'running' },
+        { vmid: 101, status: 'stopped' }
+      ],
+      '/nodes/pve1/lxc': [
+        { vmid: 200, status: 'running' }
+      ]
+    });
+    var app = buildApp();
+    return request(app).get('/api/px/home-summary').expect(200).then(function (res) {
+      expect(res.body.totals).toEqual({
+        nodes: 1, online: 1, vmsRunning: 2, vmsStopped: 1
+      });
+      expect(res.body.nodes).toHaveLength(1);
+      var n = res.body.nodes[0];
+      expect(n.node).toBe('pve1');
+      expect(n.vmsRunning).toBe(2);
+      expect(n.vmsStopped).toBe(1);
+      /* Raw totals pass through so the widget can show both bar and figure */
+      expect(n.mem).toBe(12884901888);
+      expect(n.maxmem).toBe(34359738368);
+      expect(n.cpu).toBeCloseTo(0.07);
+    });
+  });
+
+  test('counts guests across every node in the cluster', function () {
+    writePXConfig();
+    currentHandler = clusterHandler({
+      '/nodes': [
+        { node: 'pve1', status: 'online',  cpu: 0.1, maxcpu: 4, mem: 1, maxmem: 2, disk: 1, maxdisk: 2 },
+        { node: 'pve2', status: 'offline', cpu: 0,   maxcpu: 4, mem: 0, maxmem: 2, disk: 0, maxdisk: 2 }
+      ],
+      '/nodes/pve1/qemu': [{ vmid: 100, status: 'running' }],
+      '/nodes/pve1/lxc':  [],
+      '/nodes/pve2/qemu': [{ vmid: 300, status: 'stopped' }],
+      '/nodes/pve2/lxc':  [{ vmid: 400, status: 'running' }]
+    });
+    var app = buildApp();
+    return request(app).get('/api/px/home-summary').expect(200).then(function (res) {
+      expect(res.body.totals).toEqual({
+        nodes: 2, online: 1, vmsRunning: 2, vmsStopped: 1
+      });
+      expect(res.body.nodes.map(function (n) { return n.node; })).toEqual(['pve1', 'pve2']);
+    });
+  });
+
+  /* One flaky node must degrade to a partial count, not blank the card. */
+  test('still reports a node whose guest list fails', function () {
+    writePXConfig();
+    currentHandler = clusterHandler({
+      '/nodes': [{ node: 'pve1', status: 'online', cpu: 0.5, maxcpu: 8, mem: 1, maxmem: 2, disk: 1, maxdisk: 2 }],
+      '/nodes/pve1/qemu': [{ vmid: 100, status: 'running' }]
+      /* /nodes/pve1/lxc deliberately absent -> 500 from the stand-in */
+    });
+    var app = buildApp();
+    return request(app).get('/api/px/home-summary').expect(200).then(function (res) {
+      expect(res.body.nodes).toHaveLength(1);
+      expect(res.body.nodes[0].vmsRunning).toBe(1);
+      expect(res.body.totals.online).toBe(1);
+    });
+  });
+
+  test('502 when the node list itself fails', function () {
+    writePXConfig({ px_url: 'http://127.0.0.1:1' }); // nothing listens on port 1
+    var app = buildApp();
+    return request(app).get('/api/px/home-summary').expect(502);
+  });
+
+  test('serves an empty cluster without hanging', function () {
+    writePXConfig();
+    currentHandler = clusterHandler({ '/nodes': [] });
+    var app = buildApp();
+    return request(app).get('/api/px/home-summary').expect(200).then(function (res) {
+      expect(res.body.nodes).toEqual([]);
+      expect(res.body.totals.nodes).toBe(0);
+    });
+  });
+});

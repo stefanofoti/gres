@@ -39,8 +39,9 @@
 
       <div class="home-content">
 
-        <!-- Quick glance row: Weather + Jellyfin side by side -->
-        <div class="home-glance-row" id="home-widgets">
+        <!-- The one widget grid. Every Home widget lives here; the
+             cards themselves are built by js/widgets.js. -->
+        <div class="w-grid" id="home-widgets">
           <!-- populated by JS -->
         </div>
 
@@ -56,42 +57,6 @@
           </div>
           <div class="home-empty-title">No widgets yet</div>
           <div class="home-empty-desc">Enable features and add widgets from Settings</div>
-        </div>
-
-        <!-- Placeholder widgets for upcoming Proxmox + Markets -->
-        <div class="home-placeholder-row" id="home-placeholder-row">
-          <div class="home-placeholder-card">
-            <div class="home-placeholder-card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="2" y="3" width="20" height="6" rx="2" stroke="#3a3a5a" stroke-width="1.5"/>
-                <rect x="2" y="13" width="20" height="6" rx="2" stroke="#3a3a5a" stroke-width="1.5"/>
-                <circle cx="18" cy="6" r="1" fill="#3a3a5a"/>
-                <circle cx="18" cy="16" r="1" fill="#3a3a5a"/>
-              </svg>
-            </div>
-            <div class="home-placeholder-card-label">VM Monitor</div>
-            <div class="home-placeholder-card-sub">Coming soon</div>
-          </div>
-          <div class="home-placeholder-card">
-            <div class="home-placeholder-card-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <polyline points="3,17 8,11 13,14 21,6" stroke="#3a3a5a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M17 6h4v4" stroke="#3a3a5a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <line x1="3" y1="21" x2="21" y2="21" stroke="#3a3a5a" stroke-width="1.4" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <div class="home-placeholder-card-label">Markets</div>
-            <div class="home-placeholder-card-sub">Coming soon</div>
-          </div>
-        </div>
-
-        <!-- Smart Home quick tiles -->
-        <div id="home-smarthome-section" class="home-section hidden">
-          <div class="home-section-header">
-            <div class="home-section-label">Smart Home</div>
-            <button id="home-smarthome-refresh-btn" class="btn-icon-only" title="Refresh devices">↻</button>
-          </div>
-          <div id="home-smarthome-grid" class="devices-grid"></div>
         </div>
 
       </div>
@@ -122,10 +87,27 @@
 
     <!-- METEO -->
     <div id="page-meteo" class="page">
-      <div class="page-header">
-        <div class="page-title">Weather</div>
-        <div class="page-subtitle" id="weather-subtitle">Forecast</div>
+      <div class="page-header wx-header">
+        <div class="wx-header-text">
+          <div class="page-title">Weather</div>
+          <div class="page-subtitle" id="weather-subtitle">Forecast</div>
+        </div>
+        <div class="wx-header-actions">
+          <button id="weather-other-location" class="wx-icon-btn" type="button" title="Change location" aria-label="Change location">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <circle cx="12" cy="10" r="2.5" stroke="currentColor" stroke-width="1.7"/>
+            </svg>
+          </button>
+          <button id="weather-refresh-btn" class="wx-icon-btn" type="button" title="Refresh weather data" aria-label="Refresh weather data">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <path d="M20 4v4.5h-4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
+
       <div class="page-content">
         <div id="weather-loading" class="loading-state">
           <div class="spinner"></div>
@@ -138,54 +120,33 @@
           <button class="btn-retry" id="weather-retry">Retry</button>
         </div>
 
+        <div id="weather-search-panel" class="wx-search-panel hidden">
+          <input type="search" id="weather-search-input" class="form-input" placeholder="Search location...">
+          <div id="weather-search-results" class="weather-search-results"></div>
+        </div>
+
         <div id="weather-content" class="hidden">
-          <div class="weather-top-actions">
-            <button id="weather-refresh-btn" class="btn-icon-only" title="Refresh weather data">↻</button>
-            <button id="weather-other-location" class="btn-secondary">Other location</button>
-          </div>
+          <!-- The reference-day bar, hero, hourly strip, metric tiles and
+               the 10-day list are all built by the WEATHER module in
+               js/app.js. Tapping a day in the list re-points every one of
+               them at that day. -->
+          <div class="wx-daybar" id="wx-daybar"></div>
 
-          <div id="weather-search-panel" class="weather-search-panel hidden">
-            <input type="search" id="weather-search-input" class="form-input" placeholder="Search location...">
-            <div id="weather-search-results" class="weather-search-results"></div>
-          </div>
+          <div class="wx-hero" id="wx-hero"></div>
 
-          <div class="weather-now-card">
-            <div class="weather-now-main">
-              <div class="weather-now-city" id="weather-city">—</div>
-              <div class="weather-now-temp" id="weather-current-temp">--°</div>
-              <div class="weather-now-desc" id="weather-current-desc">—</div>
-            </div>
-            <div class="weather-now-side">
-              <div id="weather-current-icon" style="text-align:right;margin-bottom:6px;"></div>
-              <div class="weather-now-line"><span>Humidity</span><strong id="weather-current-humidity">—</strong></div>
-              <div class="weather-now-line"><span>Wind</span><strong id="weather-current-wind">—</strong></div>
+          <div class="wx-section">
+            <div class="wx-section-title" id="wx-hours-title">Next 24 hours</div>
+            <div class="wx-hours-scroll">
+              <div class="wx-hours" id="wx-hours"></div>
             </div>
           </div>
 
-          <div class="weather-highlight-grid">
-            <div class="weather-day-card">
-              <div class="weather-day-card-icon" id="weather-today-icon"></div>
-              <div class="weather-day-label">Today</div>
-              <div class="weather-day-temp"><span id="weather-today-max">--°</span><small id="weather-today-min">--°</small></div>
-              <div class="weather-day-desc" id="weather-today-desc">—</div>
-              <div class="weather-day-precip" id="weather-today-precip" style="display:none;margin-top:5px;font-size:10px;"></div>
-            </div>
-            <div class="weather-day-card">
-              <div class="weather-day-card-icon" id="weather-tomorrow-icon"></div>
-              <div class="weather-day-label">Tomorrow</div>
-              <div class="weather-day-temp"><span id="weather-tomorrow-max">--°</span><small id="weather-tomorrow-min">--°</small></div>
-              <div class="weather-day-desc" id="weather-tomorrow-desc">—</div>
-              <div class="weather-day-precip" id="weather-tomorrow-precip" style="display:none;margin-top:5px;font-size:10px;"></div>
-            </div>
-          </div>
+          <div class="wx-metrics" id="wx-metrics"></div>
 
-          <div class="weather-chart-block">
-            <div class="section-label">Temperature trend · 10 days</div>
-            <div id="weather-temp-chart" class="weather-chart"></div>
+          <div class="wx-section">
+            <div class="wx-section-title">10-day forecast</div>
+            <div class="wx-days" id="wx-days"></div>
           </div>
-
-          <div class="section-label">Next 10 days</div>
-          <div id="weather-days-list" class="weather-days-list"></div>
         </div>
       </div>
     </div>
@@ -849,6 +810,10 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.4/chartist.min.js"></script>
+  <!-- widgets.js only defines window._WIDGETS; it fires no request at
+       parse time, so loading it before app.js is safe and keeps the
+       registry populated by the time the first settings load lands. -->
+  <script src="js/widgets.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

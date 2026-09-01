@@ -138,15 +138,6 @@
     return svg(cloud());
   };
 
-  /* rain-drop icon for precip probability */
-  window._wxRainIcon = function (size) {
-    var s = size || 11;
-    return '<svg xmlns="http://www.w3.org/2000/svg" width="' + s + '" height="' + s +
-      '" viewBox="0 0 24 24" fill="none">' +
-      '<path d="M12 3 C12 3 5 12 5 16 a7 7 0 0 0 14 0 C19 12 12 3 12 3z" fill="#70a0e0"/>' +
-      '</svg>';
-  };
-
   /* ── toast ──────────────────────────────────────────── */
   var _toastTimer;
   function toast(msg, dur) {
@@ -1055,6 +1046,11 @@ if (pinReady) {
     return base;
   }
 
+  /* Shared with the Home widget so a tile reads the same on both tabs,
+     and so a poll-driven sync never rewrites it in a different format
+     than the initial build used. */
+  window._haStateText = buildStateText;
+
   function applyCardColor(card, entity) {
     var attr = entity.attributes || {};
     if (attr.hs_color) {
@@ -1293,17 +1289,16 @@ if (pinReady) {
 /* ════════════════════════════════════════════════════════
    HOME MODULE
    Renders home_widgets on the home tab.
-   Widget types: smarthome, jelly, meteo.
-   Jellyfin + Weather are rendered side-by-side in glance row.
+   Owns the widget grid: reads home_widgets, asks window._WIDGETS
+   which cards to build, and hands each one its shell. The widgets
+   themselves (their markup, their requests) live in js/widgets.js —
+   this module only decides what appears and in which order.
    ════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
 
-  var _glanceRow  = null;
+  var _grid       = null;
   var _emptyEl    = null;
-  var _haSection  = null;
-  var _haGrid     = null;
-  var _placeholderRow = null;
   var _widgets    = [];
   var _haEntities = null;
 
@@ -1351,16 +1346,25 @@ if (pinReady) {
     return haWidgets;
   }
 
+  /* Called by the core HA poll. The Smart Home widget owns its own
+     grid, so this finds it by marker rather than by id — the grid only
+     exists while that widget is on the Home screen. */
   window._homeSyncHAEntities = function (entities, summary) {
-    if (!_haGrid || !_haSection) return;
+    var grid = document.querySelector('#home-widgets [data-ha-grid]');
+    if (!grid) return;
+
     var haWidgets = getHomeHAWidgets();
     if (!haWidgets.length) return;
 
     if (!_haEntities) _haEntities = [];
 
-    if (!_haGrid.querySelector('.device-card[data-eid]')) {
+    /* First snapshot after the card was rendered empty: build the tiles. */
+    if (!grid.querySelector('.device-card[data-eid]')) {
       _haEntities = entities.slice();
-      buildHACards(_haGrid, haWidgets, _haEntities);
+      if (window._WIDGETS) {
+        window._WIDGETS.buildHACards(grid, haWidgets, _haEntities);
+        window._WIDGETS.updateHAStatus(haWidgets, _haEntities);
+      }
       return;
     }
 
@@ -1368,313 +1372,125 @@ if (pinReady) {
 
     var map = {};
     for (var i = 0; i < _haEntities.length; i++) map[_haEntities[i].entity_id] = _haEntities[i];
-    var cards = _haGrid.querySelectorAll('.device-card[data-eid]');
+    var cards = grid.querySelectorAll('.device-card[data-eid]');
     for (var c = 0; c < cards.length; c++) {
       var card = cards[c];
       var eid = card.getAttribute('data-eid');
       if (map[eid] && window._syncHACard) window._syncHACard(card, map[eid]);
     }
+
+    /* The tiles moved, so the header count has to move with them. */
+    if (window._WIDGETS) window._WIDGETS.updateHAStatus(haWidgets, _haEntities);
   };
 
-  /* ── main render ──────────────────────────────────── */
+  /* ── shared refresh scheduler ─────────────────────────
+     This runs on a wall panel that is never closed, so every widget
+     having its own setInterval would multiply into a steady drip of
+     requests that nobody is looking at. Instead widgets declare how
+     stale they tolerate being, one timer drives all of them, and it
+     goes quiet whenever Home is not the visible tab — returning to
+     Home re-renders anyway, which refetches everything.
+
+     The Smart Home widget is deliberately absent: the core HA poll
+     already pushes it updates through _homeSyncHAEntities. */
+  var _scheduled = [];
+  var _schedTimer = null;
+  var SCHED_TICK_MS = 30000;
+
+  function scheduleRefresh(def, ctx) {
+    if (!def.refreshSec) return;
+    _scheduled.push({ def: def, ctx: ctx, everyMs: def.refreshSec * 1000, lastAt: Date.now() });
+  }
+
+  function startScheduler() {
+    if (_schedTimer) return;
+    _schedTimer = setInterval(function () {
+      if (window._currentPage && window._currentPage !== 'home') return;
+
+      var now = Date.now();
+      for (var i = 0; i < _scheduled.length; i++) {
+        var job = _scheduled[i];
+        if (now - job.lastAt < job.everyMs) continue;
+        job.lastAt = now;
+        try {
+          /* render() rebuilds into the existing shell, so a refresh
+             never recreates the card or reflows the grid. */
+          job.def.render(job.ctx);
+        } catch (e) {
+          if (window.console && window.console.error) window.console.error(e);
+        }
+      }
+    }, SCHED_TICK_MS);
+  }
+
+  /* ── main render ──────────────────────────────────────
+     Rebuilds the whole grid. Cheap enough (a handful of cards) and it
+     keeps saved order authoritative without diffing. */
   function renderHome() {
-    _glanceRow      = $('home-widgets');
-    _emptyEl        = $('home-empty');
-    _haSection      = $('home-smarthome-section');
-    _haGrid         = $('home-smarthome-grid');
-    _placeholderRow = $('home-placeholder-row');
-    if (!_glanceRow) return;
+    _grid    = $('home-widgets');
+    _emptyEl = $('home-empty');
+    if (!_grid) return;
 
-    _glanceRow.innerHTML = '';
+    var W = window._WIDGETS;
+    if (!W) return;
 
-    var haWidgets = [];
-    var hasJelly  = false;
-    var hasMeteo  = false;
+    /* Every card is about to be replaced, so the jobs pointing at the
+       old ones go with them. */
+    _scheduled = [];
 
-    for (var i = 0; i < _widgets.length; i++) {
-      var w = _widgets[i];
-      if (w.type === 'smarthome') haWidgets.push(w);
-      else if (w.type === 'jelly') hasJelly = true;
-      else if (w.type === 'meteo') hasMeteo = true;
-    }
+    /* plan() drops types this build has no widget for, so a saved
+       config from an older version renders what it can. */
+    var cards = W.plan(_widgets);
 
-    var hasAny = haWidgets.length || hasJelly || hasMeteo;
+    _grid.innerHTML = '';
 
-    /* empty state */
     if (_emptyEl) {
-      if (hasAny) _emptyEl.classList.remove('visible');
+      if (cards.length) _emptyEl.classList.remove('visible');
       else _emptyEl.classList.add('visible');
     }
 
-    /* placeholder row: hide if we have Jelly or Meteo */
-    if (_placeholderRow) {
-      _placeholderRow.style.display = (hasJelly || hasMeteo) ? 'none' : '';
-    }
+    for (var i = 0; i < cards.length; i++) {
+      (function (item) {
+        var def  = item.def;
+        var wide = (typeof def.wide === 'function') ? def.wide(item.entries) : !!def.wide;
 
-    /* Jelly + Weather side by side in glance row */
-    if (hasJelly || hasMeteo) {
-      _glanceRow.style.display = '';
-      if (hasJelly) {
-        var jCol = document.createElement('div');
-        jCol.className = 'home-glance-col';
-        _glanceRow.appendChild(jCol);
-        renderJellyCard(jCol);
-      }
-      if (hasMeteo) {
-        var wCol = document.createElement('div');
-        wCol.className = 'home-glance-col';
-        _glanceRow.appendChild(wCol);
-        renderWeatherCard(wCol);
-      }
-      /* solo: add class so it stretches full width */
-      if ((hasJelly ? 1 : 0) + (hasMeteo ? 1 : 0) === 1) {
-        _glanceRow.className = 'home-glance-row solo';
-      } else {
-        _glanceRow.className = 'home-glance-row';
-      }
-    } else {
-      _glanceRow.style.display = 'none';
-    }
+        var shell = W.shell({
+          title:     def.title,
+          icon:      W.icons[def.type],
+          wide:      wide,
+          flush:     !!def.flush,
+          cardClass: def.cardClass,
+          onTap:     def.page ? function () { W.goToTab(def.page); } : null
+        });
 
-    /* HA tiles */
-    if (_haSection && _haGrid) {
-      if (haWidgets.length) {
-        _haSection.classList.remove('hidden');
-        if (!_haEntities || !_haGrid.querySelector('.device-card[data-eid]')) {
-          _haGrid.innerHTML = '';
-          buildHACards(_haGrid, haWidgets, _haEntities || []);
-          if (!_haEntities || !_haEntities.length) {
-            if (window._refreshHADevices) window._refreshHADevices({ silent: true });
-          }
+        _grid.appendChild(shell.el);
+
+        var ctx = {
+          def:      def,
+          card:     shell,
+          body:     shell.body,
+          entries:  item.entries,
+          entry:    item.entries[0],
+          entities: _haEntities || []
+        };
+
+        scheduleRefresh(def, ctx);
+
+        try {
+          def.render(ctx);
+        } catch (e) {
+          /* One broken widget must not take the dashboard down with it. */
+          shell.setError('Widget failed to load', null);
+          if (window.console && window.console.error) window.console.error(e);
         }
-      } else {
-        _haSection.classList.add('hidden');
-      }
+      })(cards[i]);
     }
-  }
 
-  /* ── HA devices ────────────────────────────────────── */
-  function buildHACards(grid, haWidgets, entities) {
-    grid.innerHTML = '';
-    var entityMap = {};
-    for (var i = 0; i < entities.length; i++) entityMap[entities[i].entity_id] = entities[i];
-
-    var ICONS = { light:'○', switch:'⌁', input_boolean:'⌁', media_player:'▷', climate:'◇', fan:'◎', cover:'▭' };
-    function domainOf(eid)   { return eid.split('.')[0]; }
-    function isOn(e)         { var s=e.state; return s==='on'||s==='open'||s==='playing'||s==='paused'||s==='idle'; }
-    function stateLabel(s)   { var m={on:'On',off:'Off',open:'Open',closed:'Closed',playing:'Playing',paused:'Paused',idle:'Idle',unavailable:'N/A',unknown:'?'}; return m[s]||s; }
-    function friendlyName(e) { return (e.attributes&&e.attributes.friendly_name)?e.attributes.friendly_name:e.entity_id.split('.')[1].replace(/_/g,' '); }
-    function make(tag,cls,txt){ var el=document.createElement(tag); if(cls)el.className=cls; if(txt!=null)el.textContent=txt; return el; }
-
-    for (var k = 0; k < haWidgets.length; k++) {
-      (function (w) {
-        var entity = entityMap[w.id];
-        if (!entity) {
-          var ghost = make('div','device-card unavail');
-          ghost.appendChild(make('div','card-icon','◈'));
-          var gi=make('div','card-info'); gi.appendChild(make('div','card-name',w.label||w.id)); gi.appendChild(make('div','card-state','N/A'));
-          ghost.appendChild(gi); grid.appendChild(ghost); return;
-        }
-        var on = isOn(entity), unavail = entity.state==='unavailable', domain = domainOf(entity.entity_id);
-        var card = make('div','device-card'+(on?' on':'')+(unavail?' unavail':''));
-        card.setAttribute('data-eid', entity.entity_id);
-        var ico=make('div','card-icon',ICONS[domain]||'◈');
-        var info=make('div','card-info');
-        info.appendChild(make('div','card-name',friendlyName(entity)));
-        var stateEl=make('div','card-state',stateLabel(entity.state));
-        info.appendChild(stateEl);
-
-        if (domain==='light' && !unavail) {
-          var split=make('div','light-card-split');
-          var lb=make('button','light-main-toggle'); lb.type='button';
-          var iw=make('div','light-main-icon-wrap'); iw.appendChild(ico); lb.appendChild(iw); lb.appendChild(info);
-          var rb=make('button','light-detail-open','›'); rb.type='button';
-          lb.addEventListener('click', function(ev){ ev.stopPropagation();
-            window._guardDeviceAction(entity.entity_id, function () {
-              window._xhr('POST','/api/ha/service',{domain:'light',service:on?'turn_off':'turn_on',service_data:{entity_id:entity.entity_id}},function(err){
-                if(!err){on=!on;entity.state=on?'on':'off';card.className='device-card'+(on?' on':'');stateEl.textContent=stateLabel(entity.state);}
-              });
-            });
-          });
-          rb.addEventListener('click',function(ev){ ev.stopPropagation(); if(window._openLightSheet)window._openLightSheet(entity); });
-          split.appendChild(lb); split.appendChild(rb); card.appendChild(split);
-        } else {
-          card.appendChild(ico); card.appendChild(info);
-          if (!unavail) {
-            card.addEventListener('click', function(){
-              var svc=on?(domain==='cover'?'close_cover':'turn_off'):(domain==='cover'?'open_cover':'turn_on');
-              var sd=domain==='cover'?'cover':(domain==='media_player'?'media_player':domain);
-              window._guardDeviceAction(entity.entity_id, function () {
-                window._xhr('POST','/api/ha/service',{domain:sd,service:svc,service_data:{entity_id:entity.entity_id}},function(err){
-                  if(!err){on=!on;entity.state=on?'on':'off';card.className='device-card'+(on?' on':'');stateEl.textContent=stateLabel(entity.state);}
-                });
-              });
-            });
-          }
-        }
-        grid.appendChild(card);
-      })(haWidgets[k]);
-    }
-  }
-
-  /* ── Jellyfin card ─────────────────────────────────── */
-  function renderJellyCard(col) {
-    var card = document.createElement('div');
-    card.className = 'hw-jelly-card';
-    col.appendChild(card);
-
-    /* skeleton */
-    card.innerHTML =
-      '<div class="hw-jelly-posters">' +
-        '<div class="hw-jelly-poster"><div class="hw-jelly-poster-fallback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="#3a3a5a" stroke-width="1.6"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="#3a3a5a"/></svg></div></div>' +
-        '<div class="hw-jelly-poster"><div class="hw-jelly-poster-fallback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="#3a3a5a" stroke-width="1.6"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="#3a3a5a"/></svg></div></div>' +
-        '<div class="hw-jelly-poster"><div class="hw-jelly-poster-fallback"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="#3a3a5a" stroke-width="1.6"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="#3a3a5a"/></svg></div></div>' +
-      '</div>' +
-      '<div class="hw-jelly-meta">' +
-        '<div class="hw-jelly-meta-left"><span class="hw-jelly-icon"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="currentColor"/></svg></span><span class="hw-jelly-title">Jellyfin</span></div>' +
-        '<span class="hw-jelly-counts">…</span>' +
-        '<span class="hw-jelly-arrow">›</span>' +
-      '</div>';
-
-    window._xhr('GET', '/api/jf/home-summary', null, function (err, data) {
-      if (err || !data) {
-        card.querySelector('.hw-jelly-counts').textContent = 'N/A';
-        return;
-      }
-      var postersEl = card.querySelector('.hw-jelly-posters');
-      postersEl.innerHTML = '';
-      var recent = Array.isArray(data.recentMovies) ? data.recentMovies : [];
-      while (recent.length < 3) recent.push(null);
-      recent = recent.slice(0, 3);
-      for (var i = 0; i < 3; i++) {
-        (function (item) {
-          var div = document.createElement('div');
-          div.className = 'hw-jelly-poster';
-          var fb = document.createElement('div');
-          fb.className = 'hw-jelly-poster-fallback';
-          fb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="18" rx="3" stroke="#3a3a5a" stroke-width="1.6"/><path d="M10 8.5l5 3.5-5 3.5V8.5z" fill="#3a3a5a"/></svg>';
-          div.appendChild(fb);
-          if (item && item.id) {
-            var img = new Image();
-            img.onload = function () { div.style.backgroundImage = 'url(' + img.src + ')'; };
-            img.src = '/api/jf/image/' + item.id + '?type=Primary&maxH=220';
-          }
-          if (item) {
-            var ttl = document.createElement('div');
-            ttl.className = 'hw-jelly-poster-title';
-            ttl.textContent = item.name + (item.year ? ' ' + item.year : '');
-            div.appendChild(ttl);
-          }
-          postersEl.appendChild(div);
-        })(recent[i]);
-      }
-      var counts = (data.totalMovies || 0) + ' films · ' + (data.totalSeries || 0) + ' series';
-      card.querySelector('.hw-jelly-counts').textContent = counts;
-    });
-
-    card.addEventListener('click', function () {
-      var t = document.querySelector('[data-page="jelly"]');
-      if (t) t.click();
-    });
-  }
-
-  /* ── Weather card ──────────────────────────────────── */
-  function renderWeatherCard(col) {
-    var card = document.createElement('div');
-    card.className = 'hw-wx-card';
-    col.appendChild(card);
-
-    card.innerHTML = '<div class="hw-wx-na">Loading…</div>';
-
-    window._xhr('GET', '/api/weather/home-summary', null, function (err, data) {
-      card.innerHTML = '';
-
-      if (err || !data || !data.current) {
-        card.innerHTML = '<div class="hw-wx-na">N/A</div>';
-        return;
-      }
-
-      var cur   = data.current;
-      var today = data.today    || {};
-      var loc   = data.location || {};
-      var code  = cur.weatherCode != null ? cur.weatherCode : 0;
-      var isDay = cur.isDay      != null ? cur.isDay        : 1;
-
-      /* ── top bar: pin + location ── */
-      var topbar = document.createElement('div');
-      topbar.className = 'hw-wx-topbar';
-      var pin = document.createElement('span');
-      pin.className = 'hw-wx-pin';
-      pin.textContent = '⌖';          /* pin-point glyph */
-      var locEl = document.createElement('span');
-      locEl.className = 'hw-wx-loc';
-      locEl.textContent = loc.name || '';
-      topbar.appendChild(pin);
-      topbar.appendChild(locEl);
-      card.appendChild(topbar);
-
-      /* ── main row ── */
-      var main = document.createElement('div');
-      main.className = 'hw-wx-main';
-
-      /* icon — large */
-      var iconEl = document.createElement('div');
-      iconEl.className = 'hw-wx-icon';
-      if (window._wxIcon) iconEl.innerHTML = window._wxIcon(code, isDay, 42);
-      main.appendChild(iconEl);
-
-      /* current temp */
-      var tempEl = document.createElement('div');
-      tempEl.className = 'hw-wx-temp';
-      tempEl.textContent = cur.temp != null ? cur.temp + '°' : '--°';
-      main.appendChild(tempEl);
-
-      /* max / min stacked */
-      var rangeCol = document.createElement('div');
-      rangeCol.className = 'hw-wx-range-col';
-      var maxEl = document.createElement('div');
-      maxEl.className = 'hw-wx-range-max';
-      maxEl.textContent = today.tempMax != null ? today.tempMax + '°' : '--°';
-      var minEl = document.createElement('div');
-      minEl.className = 'hw-wx-range-min';
-      minEl.textContent = today.tempMin != null ? today.tempMin + '°' : '--°';
-      rangeCol.appendChild(maxEl);
-      rangeCol.appendChild(minEl);
-      main.appendChild(rangeCol);
-
-      /* humidity pushed to right */
-      var humCol = document.createElement('div');
-      humCol.className = 'hw-wx-humidity-col';
-      var humLabel = document.createElement('div');
-      humLabel.className = 'hw-wx-hum-label';
-      humLabel.textContent = 'Prec.';
-      var humVal = document.createElement('div');
-      humVal.className = 'hw-wx-hum-val';
-      humVal.textContent = today.precipProb != null ? Math.round(today.precipProb) + '%' : '--';
-      humCol.appendChild(humLabel);
-      humCol.appendChild(humVal);
-      main.appendChild(humCol);
-
-      card.appendChild(main);
-    });
-
-    card.addEventListener('click', function () {
-      var t = document.querySelector('[data-page="meteo"]');
-      if (t) t.click();
-    });
+    if (_scheduled.length) startScheduler();
   }
 
   /* ── hook: refresh on home tab click ───────────────── */
   /* handled by core module calling window._homeRefresh() */
-
-  var _homeRefreshBtn = $('home-smarthome-refresh-btn');
-  if (_homeRefreshBtn) {
-    _homeRefreshBtn.addEventListener('click', function () {
-      _homeRefreshBtn.classList.add('is-busy');
-      setTimeout(function () { _homeRefreshBtn.classList.remove('is-busy'); }, 600);
-      if (window._refreshHADevices) window._refreshHADevices({ silent: true });
-    });
-  }
 
 })();
 
@@ -1983,6 +1799,23 @@ if (pinReady) {
 
 /* ════════════════════════════════════════════════════════
    WEATHER MODULE
+
+   Renders the Weather tab from a single /api/weather/forecast
+   call: a hero, a scrollable next-24-hours strip, a grid of
+   metric tiles, and a 10-day list with range bars.
+
+   Two rules this module follows throughout:
+
+   1. It never constructs a Date from an API string. Open-Meteo
+      returns timezone-less local ISO ("2026-08-31T14:00"), which
+      iOS 9 WebKit parses as UTC under the ES5 rule — every clock
+      label would be shifted by the location's offset. The route
+      pre-formats `clock`, `weekday`, `sunriseTime` and friends,
+      and this module only ever prints them.
+
+   2. Everything numeric that reaches the DOM goes through the
+      formatters below, so a missing upstream field renders as a
+      dash instead of "NaN" or "undefined°".
    ════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
@@ -1993,15 +1826,40 @@ if (pinReady) {
     selectedSettingsLocation: null,
     settingsSearchTimer: null,
     meteoSearchTimer: null,
-    chart: null,
-    loaded: false
+    loaded: false,
+    /* The day browser: the last forecast payload, the location it
+       describes, and which day of it the hero, strip and tiles are
+       currently showing. 0 is today, the only index with live data. */
+    data: null,
+    location: null,
+    selectedDayIndex: 0
   };
 
   function $w(id) { return document.getElementById(id); }
 
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function clear(node) {
+    while (node && node.firstChild) node.removeChild(node.firstChild);
+  }
+
   function wxGet(url, cb)            { window._xhr('GET',  url, null, cb); }
   function wxPostSettings(body, cb)  { window._xhr('POST', '/api/settings', body, cb); }
   function wxToast(msg)              { window._toast(msg); }
+
+  /* ── formatters ──────────────────────────────────────── */
+  function num(v) {
+    return (v === undefined || v === null || isNaN(v)) ? null : v;
+  }
+
+  function temp(v) {
+    return num(v) === null ? '--°' : Math.round(v) + '°';
+  }
 
   function locLabel(loc) {
     if (!loc) return '—';
@@ -2012,38 +1870,62 @@ if (pinReady) {
   }
 
   function weatherCodeLabel(code) {
-    if (code === 0) return 'Sunny';
-    if (code === 1) return 'Mostly Sunny';
-    if (code === 2) return 'Partly Cloudy';
+    if (code === 0) return 'Clear';
+    if (code === 1) return 'Mostly clear';
+    if (code === 2) return 'Partly cloudy';
     if (code === 3) return 'Cloudy';
     if (code === 45 || code === 48) return 'Fog';
-    if (code === 51 || code === 53 || code === 55) return 'Light Rain';
-    if (code === 56 || code === 57) return 'Freezing Drizzle';
+    if (code === 51 || code === 53 || code === 55) return 'Drizzle';
+    if (code === 56 || code === 57) return 'Freezing drizzle';
     if (code === 61 || code === 63 || code === 65) return 'Rain';
-    if (code === 66 || code === 67) return 'Freezing Rain';
+    if (code === 66 || code === 67) return 'Freezing rain';
     if (code === 71 || code === 73 || code === 75) return 'Snow';
-    if (code === 77) return 'Ice Pellets';
-    if (code === 80 || code === 81 || code === 82) return 'Light showers';
+    if (code === 77) return 'Ice pellets';
+    if (code === 80 || code === 81 || code === 82) return 'Showers';
     if (code === 85 || code === 86) return 'Snow showers';
     if (code === 95) return 'Thunderstorm';
     if (code === 96 || code === 99) return 'Thunderstorm with hail';
-    return 'Variable conditions';
+    return 'Variable';
   }
 
-  function weekdayLabel(dateStr) {
-    if (!dateStr) return '—';
-    var p = dateStr.split('-');
-    if (p.length !== 3) return dateStr;
-    var d = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
-    var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return names[d.getDay()];
+  /* 0-360 -> the compass point the wind is blowing FROM */
+  var COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  function compass(deg) {
+    if (num(deg) === null) return '';
+    return COMPASS[Math.round(deg / 22.5) % 16];
   }
 
-  function temp(v) {
-    if (v === undefined || v === null || isNaN(v)) return '--°';
-    return Math.round(v) + '°';
+  /* The UV number alone means little; the band is the actionable part. */
+  function uvBand(uv) {
+    if (num(uv) === null) return '';
+    if (uv < 3)  return 'Low';
+    if (uv < 6)  return 'Moderate';
+    if (uv < 8)  return 'High';
+    if (uv < 11) return 'Very high';
+    return 'Extreme';
   }
 
+  function pct(v) {
+    return num(v) === null ? '—' : Math.round(v) + '%';
+  }
+
+  /* ── small inline icons for the metric tiles ─────────── */
+  function tileIcon(path) {
+    return '<svg width="11" height="11" viewBox="0 0 24 24" fill="none">' + path + '</svg>';
+  }
+  var TILE_ICONS = {
+    feels:  tileIcon('<path d="M12 3v10.5a3.5 3.5 0 1 1-2 0V3a1 1 0 0 1 2 0z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'),
+    hum:    tileIcon('<path d="M12 3s6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 6-11 6-11z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>'),
+    wind:   tileIcon('<path d="M3 8h11a3 3 0 1 0-3-3M3 14h14a3 3 0 1 1-3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+    uv:     tileIcon('<circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+    press:  tileIcon('<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 12l4-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+    precip: tileIcon('<path d="M7 15a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.2A3.5 3.5 0 1 1 17 15z" stroke="currentColor" stroke-width="1.6"/><path d="M9 18l-1 3M13 18l-1 3M17 18l-1 3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>'),
+    sun:    tileIcon('<path d="M4 17h16M7.5 17a4.5 4.5 0 0 1 9 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 4v2.5M5.6 7.6l1.8 1.8M18.4 7.6l-1.8 1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'),
+    cloud:  tileIcon('<path d="M7 18a4.5 4.5 0 0 1 0-9 5.5 5.5 0 0 1 10.5-1.3A3.9 3.9 0 1 1 17.5 18z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>')
+  };
+
+  /* ── settings / location plumbing ────────────────────── */
   function loadSettingsWeather(cb) {
     wxGet('/api/settings', function (err, data) {
       if (err || !data) { cb(err || 'Error loading settings', null); return; }
@@ -2052,27 +1934,34 @@ if (pinReady) {
     });
   }
 
-  function renderLocationSearchResults(el, locations, onPick) {
-    el.innerHTML = '';
+  function renderLocationSearchResults(container, locations, onPick) {
+    clear(container);
     if (!locations || !locations.length) {
-      el.innerHTML = '<div class="form-hint">No results found</div>';
+      container.appendChild(el('div', 'form-hint', 'No results found'));
       return;
     }
     for (var i = 0; i < locations.length; i++) {
       (function (loc) {
-        var b = document.createElement('button');
+        var b = el('button', 'weather-search-item');
         b.type = 'button';
-        b.className = 'weather-search-item';
-        b.innerHTML = '<strong>' + loc.name + '</strong>' +
-          '<span>' + (loc.admin1 || '') + (loc.admin1 && loc.country ? ', ' : '') + (loc.country || '') + '</span>';
+        b.appendChild(el('strong', null, loc.name));
+        b.appendChild(el('span', null,
+          (loc.admin1 || '') + (loc.admin1 && loc.country ? ', ' : '') + (loc.country || '')));
         b.addEventListener('click', function () { onPick(loc); });
-        el.appendChild(b);
+        container.appendChild(b);
       })(locations[i]);
     }
   }
 
   function loadForecastForLocation(loc, forceRefresh) {
     if (!loc) return;
+
+    /* Reset the day browser here rather than on tab entry: a one-off
+       location search and a saved default both land on this path, and a
+       selection surviving either would show one city's Tuesday under
+       another city's name. */
+    wx.selectedDayIndex = 0;
+
     $w('weather-loading').classList.remove('hidden');
     $w('weather-error').classList.add('hidden');
     $w('weather-content').classList.add('hidden');
@@ -2080,10 +1969,8 @@ if (pinReady) {
     var url = '/api/weather/forecast?lat=' + encodeURIComponent(loc.latitude) +
       '&lon=' + encodeURIComponent(loc.longitude) +
       '&timezone=' + encodeURIComponent(loc.timezone || 'auto');
-    
-    if (forceRefresh) {
-      url += '&force=true';
-    }
+
+    if (forceRefresh) url += '&force=true';
 
     wxGet(url, function (err, data) {
       $w('weather-loading').classList.add('hidden');
@@ -2094,123 +1981,444 @@ if (pinReady) {
       }
       $w('weather-content').classList.remove('hidden');
       wx.loaded = true;
+      wx.data = data;
+      wx.location = loc;
       renderWeather(data, loc);
     });
   }
 
-  function renderWeather(data, loc) {
-    var cur      = data.current  || {};
-    var today    = data.today    || {};
-    var tomorrow = data.tomorrow || {};
-    var days     = data.days     || [];
-    var isDay    = cur.is_day != null ? cur.is_day : 1;
-
-    $w('weather-city').textContent = locLabel(loc);
-    $w('weather-subtitle').textContent = 'Weather · ' + (loc.name || 'location');
-    $w('weather-current-temp').textContent = temp(cur.temperature_2m);
-    $w('weather-current-desc').textContent = weatherCodeLabel(cur.weather_code);
-    $w('weather-current-humidity').textContent =
-      (cur.relative_humidity_2m != null) ? (Math.round(cur.relative_humidity_2m) + '%') : '—';
-    $w('weather-current-wind').textContent =
-      (cur.wind_speed_10m != null) ? (Math.round(cur.wind_speed_10m) + ' km/h') : '—';
-
-    /* large icon in now-card */
-    var iconSlot = $w('weather-current-icon');
-    if (iconSlot && window._wxIcon) iconSlot.innerHTML = window._wxIcon(cur.weather_code, isDay, 48);
-
-    $w('weather-today-max').textContent = temp(today.tempMax);
-    $w('weather-today-min').textContent = temp(today.tempMin);
-    $w('weather-today-desc').textContent = weatherCodeLabel(today.weatherCode);
-    var todayIcon = $w('weather-today-icon');
-    if (todayIcon && window._wxIcon) todayIcon.innerHTML = window._wxIcon(today.weatherCode, 1, 26);
-    var todayPrecip = $w('weather-today-precip');
-    if (todayPrecip) {
-      if (today.precipProb != null) {
-        todayPrecip.innerHTML = (window._wxRainIcon ? window._wxRainIcon(10) : '') + ' ' + Math.round(today.precipProb) + '%';
-        todayPrecip.style.display = '';
-      } else { todayPrecip.style.display = 'none'; }
-    }
-
-    $w('weather-tomorrow-max').textContent = temp(tomorrow.tempMax);
-    $w('weather-tomorrow-min').textContent = temp(tomorrow.tempMin);
-    $w('weather-tomorrow-desc').textContent = weatherCodeLabel(tomorrow.weatherCode);
-    var tomorrowIcon = $w('weather-tomorrow-icon');
-    if (tomorrowIcon && window._wxIcon) tomorrowIcon.innerHTML = window._wxIcon(tomorrow.weatherCode, 1, 26);
-    var tomorrowPrecip = $w('weather-tomorrow-precip');
-    if (tomorrowPrecip) {
-      if (tomorrow.precipProb != null) {
-        tomorrowPrecip.innerHTML = (window._wxRainIcon ? window._wxRainIcon(10) : '') + ' ' + Math.round(tomorrow.precipProb) + '%';
-        tomorrowPrecip.style.display = '';
-      } else { tomorrowPrecip.style.display = 'none'; }
-    }
-
-    renderWeatherChart(days);
-    render10Days(days);
+  /**
+   * Point the whole view at a different day. Everything needed is already
+   * in the cached payload, so this never refetches — switching days is
+   * local work, which is what makes the list usable as a picker.
+   */
+  function selectDay(index) {
+    if (!wx.data) return;
+    var days = wx.data.days || [];
+    if (index < 0 || index >= days.length) return;
+    wx.selectedDayIndex = index;
+    renderWeather(wx.data, wx.location);
+    /* Jump back to the top so the day just picked is what you are looking
+       at — the tap lands at the bottom of a scrolled page, and the detail
+       it selects is rendered above the fold.
+       `.page` is the scroller here (#app is fixed and overflow:hidden),
+       not the window, so scrollTo() would be a no-op. */
+    var page = document.getElementById('page-meteo');
+    if (page) page.scrollTop = 0;
   }
 
-  function renderWeatherChart(days) {
-    var elId = 'weather-temp-chart';
-    var el = $w(elId);
-    if (!el) return;
-    if (!window.Chartist) { el.innerHTML = '<div class="form-hint">Grafico non disponibile</div>'; return; }
+  /* ── render: the reference-day bar ───────────────────────
+     Always on top of the view, so which day everything below refers to
+     is never in doubt. It is also where the way back lives. */
+  function renderDayBar(data, dayIndex) {
+    var host = $w('wx-daybar');
+    if (!host) return;
+    clear(host);
 
-    var labels = [], maxS = [], minS = [];
-    for (var i = 0; i < days.length && i < 10; i++) {
-      labels.push(weekdayLabel(days[i].date));
-      maxS.push(days[i].tempMax != null ? parseFloat(days[i].tempMax) : 0);
-      minS.push(days[i].tempMin != null ? parseFloat(days[i].tempMin) : 0);
+    var day = (data.days || [])[dayIndex] || {};
+    var isToday = dayIndex === 0;
+
+    var label = el('div', 'wx-daybar-label');
+    if (isToday) label.appendChild(el('span', 'wx-daybar-today', 'Today'));
+    label.appendChild(el('span', 'wx-daybar-date', day.dateLabel || day.date || ''));
+    host.appendChild(label);
+
+    host.appendChild(el('span', 'wx-daybar-spacer'));
+
+    /* The way back only exists when there is somewhere to go back from. */
+    if (!isToday) {
+      var back = el('button', 'wx-daybar-back', 'Today');
+      back.type = 'button';
+      back.addEventListener('click', function () { selectDay(0); });
+      host.appendChild(back);
     }
-    if (wx.chart && wx.chart.detach) { try { wx.chart.detach(); } catch (e) {} }
-    wx.chart = new Chartist.Line('#' + elId, { labels: labels, series: [maxS, minS] }, {
-      showPoint: false, lineSmooth: false, fullWidth: true,
-      axisX: { showGrid: false }, axisY: { onlyInteger: true, offset: 26 },
-      chartPadding: { top: 8, right: 8, bottom: 8, left: 0 }
-    });
   }
 
-  function render10Days(days) {
-    var list = $w('weather-days-list');
-    if (!list) return;
-    list.innerHTML = '';
+  /* ── render: hero ────────────────────────────────────── */
+  function renderHero(data, loc, dayIndex) {
+    var host = $w('wx-hero');
+    if (!host) return;
+    clear(host);
+
+    var isToday = dayIndex === 0;
+    var cur     = data.current || {};
+    var day     = (data.days || [])[dayIndex] || {};
+
+    /* A browsed day has no time of day, so it is always drawn in its
+       daylight form; only today follows the sun. */
+    var isDay = isToday ? (cur.is_day != null ? cur.is_day : 1) : 1;
+    var code  = isToday ? cur.weather_code : day.weatherCode;
+
+    host.className = 'wx-hero' + (isDay ? '' : ' is-night');
+
+    var top = el('div', 'wx-hero-top');
+    top.appendChild(el('div', 'wx-hero-loc', locLabel(loc)));
+    /* "as of" is a live-only fact — a Thursday has no reading time. */
+    if (isToday && data.currentTime) {
+      top.appendChild(el('div', 'wx-hero-updated', 'as of ' + data.currentTime));
+    }
+    host.appendChild(top);
+
+    var main = el('div', 'wx-hero-main');
+
+    var icon = el('div', 'wx-hero-icon');
+    if (window._wxIcon) icon.innerHTML = window._wxIcon(code, isDay, 56);
+    main.appendChild(icon);
+
+    /* Today leads with the temperature it is now; any other day leads
+       with its high, which is that day's headline number. */
+    main.appendChild(el('div', 'wx-hero-temp',
+      isToday ? temp(cur.temperature_2m) : temp(day.tempMax)));
+
+    var meta = el('div', 'wx-hero-meta');
+    meta.appendChild(el('div', 'wx-hero-cond', weatherCodeLabel(code)));
+
+    var feels = isToday ? num(cur.apparent_temperature) : num(day.feelsMax);
+    if (feels !== null) {
+      meta.appendChild(el('div', 'wx-hero-feels',
+        (isToday ? 'Feels like ' : 'Feels up to ') + temp(feels)));
+    }
+    main.appendChild(meta);
+
+    /* spacer keeps the right-hand block pinned while the condition truncates */
+    var spacer = el('div');
+    spacer.style.cssText = '-webkit-box-flex:1;-webkit-flex:1;flex:1;min-width:0';
+    main.appendChild(spacer);
+
+    var range = el('div', 'wx-hero-range');
+    if (isToday) {
+      range.appendChild(el('div', 'wx-hero-range-hi', 'H ' + temp(day.tempMax)));
+      range.appendChild(el('div', 'wx-hero-range-lo', 'L ' + temp(day.tempMin)));
+    } else {
+      /* The high is already the big number, so repeating it here would
+         waste the slot — spend it on the low and the sunshine instead. */
+      range.appendChild(el('div', 'wx-hero-range-hi', 'L ' + temp(day.tempMin)));
+      if (num(day.sunshineHours) !== null) {
+        range.appendChild(el('div', 'wx-hero-range-lo', day.sunshineHours + ' h sun'));
+      }
+    }
+    main.appendChild(range);
+
+    host.appendChild(main);
+  }
+
+  /* ── render: the hourly strip ────────────────────────────
+     Today reads from `hourly` — the next 24 hours from now, which
+     crosses midnight. Any other day reads that day's own 24 entries
+     from `hoursByDate`, starting at 00:00. */
+  function renderHours(data, dayIndex) {
+    var host = $w('wx-hours');
+    if (!host) return;
+    clear(host);
+
+    var isToday = dayIndex === 0;
+    var day     = (data.days || [])[dayIndex] || {};
+    var hours   = isToday
+      ? (data.hourly || [])
+      : ((data.hoursByDate || {})[day.date] || []);
+
+    var title = $w('wx-hours-title');
+    if (title) title.textContent = isToday ? 'Next 24 hours' : 'Hour by hour';
+
+    if (!hours.length) {
+      host.appendChild(el('div', 'form-hint', 'Hourly forecast unavailable'));
+      return;
+    }
+
+    for (var i = 0; i < hours.length; i++) {
+      var h = hours[i];
+      /* "Now" only means something on today's strip. */
+      var isNow = isToday && i === 0;
+      var col = el('div', 'wx-hour' + (isNow ? ' is-now' : '') + (h.isDay ? ' is-day' : ''));
+
+      col.appendChild(el('div', 'wx-hour-label', isNow ? 'Now' : h.clock));
+
+      var ico = el('div', 'wx-hour-icon');
+      if (window._wxIcon) ico.innerHTML = window._wxIcon(h.weatherCode, h.isDay, 22);
+      col.appendChild(ico);
+
+      col.appendChild(el('div', 'wx-hour-temp', temp(h.temp)));
+
+      /* Only worth the ink above a threshold — a strip of "0%" is noise. */
+      col.appendChild(el('div', 'wx-hour-precip',
+        (num(h.precipProb) !== null && h.precipProb >= 10) ? Math.round(h.precipProb) + '%' : ''));
+
+      col.appendChild(el('div', 'wx-hour-band'));
+
+      host.appendChild(col);
+    }
+  }
+
+  /* ── render: metric tiles ────────────────────────────── */
+  function metricTile(icon, label, value, sub, foot) {
+    var tile = el('div', 'wx-metric');
+
+    var lab = el('div', 'wx-metric-label');
+    if (icon) {
+      var ic = el('span');
+      ic.innerHTML = icon;
+      ic.style.cssText = 'line-height:0;display:inline-block';
+      lab.appendChild(ic);
+    }
+    lab.appendChild(el('span', null, label));
+    tile.appendChild(lab);
+
+    tile.appendChild(el('div', 'wx-metric-value', value));
+    if (sub) tile.appendChild(el('div', 'wx-metric-sub', sub));
+    if (foot) {
+      var f = el('div', 'wx-metric-foot');
+      f.appendChild(foot);
+      tile.appendChild(f);
+    }
+    return tile;
+  }
+
+  /* A 0-11+ UV reading placed on the standard colour scale. */
+  function uvScale(uv) {
+    var wrap = el('div', 'wx-scale');
+    var marker = el('div', 'wx-scale-marker');
+    marker.style.left = Math.max(0, Math.min(100, (uv / 11) * 100)) + '%';
+    wrap.appendChild(marker);
+    return wrap;
+  }
+
+  /* Sunrise -> sunset as a track, with the marker at the current time. */
+  /**
+   * Sunrise -> sunset as a track. `currentMin` is null for any day other
+   * than today: a browsed day has no "now", so it gets the bare track
+   * with no fill and no marker rather than both pinned at zero, which
+   * would read as "the sun has not risen".
+   */
+  function sunArc(day, currentMin) {
+    var wrap = el('div');
+
+    var rise = num(day.sunriseMin);
+    var set  = num(day.sunsetMin);
+
+    var track = el('div', 'wx-arc');
+    if (rise !== null && set !== null && set > rise && currentMin !== null) {
+      var progress = Math.max(0, Math.min(1, (currentMin - rise) / (set - rise)));
+
+      var fill = el('div', 'wx-arc-fill');
+      fill.style.width = (progress * 100) + '%';
+      track.appendChild(fill);
+
+      /* Before dawn or after dusk there is no position in the day to
+         show, so the marker is simply omitted. */
+      if (currentMin >= rise && currentMin <= set) {
+        var marker = el('div', 'wx-arc-marker');
+        marker.style.left = (progress * 100) + '%';
+        track.appendChild(marker);
+      }
+    }
+    wrap.appendChild(track);
+
+    var ends = el('div', 'wx-arc-ends');
+    ends.appendChild(el('span', null, day.sunriseTime || '—'));
+    ends.appendChild(el('span', null, day.sunsetTime || '—'));
+    wrap.appendChild(ends);
+
+    return wrap;
+  }
+
+  function windDial(deg) {
+    if (num(deg) === null) return null;
+    var wrap = el('span', 'wx-wind-arrow');
+    /* Meteorological convention: the reported angle is where the wind
+       comes FROM, so the arrow is turned 180° to point where it goes. */
+    var rot = (deg + 180) % 360;
+    wrap.style.cssText = '-webkit-transform:rotate(' + rot + 'deg);transform:rotate(' + rot + 'deg)';
+    wrap.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none">' +
+      '<path d="M12 3v18M12 3l-5 5M12 3l5 5" stroke="currentColor" stroke-width="1.9" ' +
+      'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return wrap;
+  }
+
+  /**
+   * Today gets all eight tiles, because a live reading exists for all of
+   * them. A browsed day gets five: humidity, pressure and cloud cover
+   * have no daily aggregate, and a 24-hour mean of any of them is not a
+   * number anyone acts on, so they are omitted rather than invented.
+   */
+  function renderMetrics(data, dayIndex) {
+    var host = $w('wx-metrics');
+    if (!host) return;
+    clear(host);
+
+    var isToday = dayIndex === 0;
+    var cur     = data.current || {};
+    var day     = (data.days || [])[dayIndex] || {};
+
+    /* Feels like — for today the delta from actual is the point; for a
+       browsed day it is the span the day is expected to cover. */
+    if (isToday) {
+      var feels = num(cur.apparent_temperature);
+      var real  = num(cur.temperature_2m);
+      var feelsSub = '';
+      if (feels !== null && real !== null) {
+        var delta = Math.round(feels) - Math.round(real);
+        feelsSub = delta === 0 ? 'Same as actual'
+          : (Math.abs(delta) + '° ' + (delta > 0 ? 'warmer' : 'cooler') + ' than actual');
+      }
+      host.appendChild(metricTile(TILE_ICONS.feels, 'Feels like', temp(feels), feelsSub));
+    } else {
+      host.appendChild(metricTile(TILE_ICONS.feels, 'Feels like',
+        temp(day.feelsMax),
+        num(day.feelsMin) === null ? '' : ('Down to ' + temp(day.feelsMin))));
+    }
+
+    /* Humidity — live only */
+    if (isToday) {
+      host.appendChild(metricTile(TILE_ICONS.hum, 'Humidity',
+        pct(cur.relative_humidity_2m),
+        num(cur.cloud_cover) !== null ? (pct(cur.cloud_cover) + ' cloud cover') : ''));
+    }
+
+    /* Wind, with a dial pointing downwind */
+    var windSpeed = isToday ? cur.wind_speed_10m : day.windMax;
+    var windDeg   = isToday ? cur.wind_direction_10m : day.windDir;
+    var windVal   = num(windSpeed) === null ? '—' : Math.round(windSpeed) + ' km/h';
+    var windTile  = metricTile(TILE_ICONS.wind, isToday ? 'Wind' : 'Wind, peak', windVal,
+      compass(windDeg) ? ('From ' + compass(windDeg)) : '');
+    var dial = windDial(windDeg);
+    if (dial) {
+      var dialFoot = el('div', 'wx-metric-foot');
+      dialFoot.appendChild(dial);
+      windTile.appendChild(dialFoot);
+    }
+    host.appendChild(windTile);
+
+    /* UV index — a daily maximum either way */
+    var uv = num(day.uvIndexMax);
+    host.appendChild(metricTile(TILE_ICONS.uv, 'UV index',
+      uv === null ? '—' : String(Math.round(uv)),
+      uvBand(uv),
+      uv === null ? null : uvScale(uv)));
+
+    /* Precipitation — probability first, amount as the supporting detail */
+    var precipSum = num(day.precipSum);
+    host.appendChild(metricTile(TILE_ICONS.precip, 'Precipitation',
+      pct(day.precipProb),
+      precipSum === null ? '' :
+        ((Math.round(precipSum * 10) / 10) + ' mm expected' + (isToday ? ' today' : ''))));
+
+    /* Pressure — live only */
+    if (isToday) {
+      host.appendChild(metricTile(TILE_ICONS.press, 'Pressure',
+        num(cur.surface_pressure) === null ? '—' : Math.round(cur.surface_pressure) + ' hPa',
+        'Surface'));
+    }
+
+    /* Sun. The arc only carries a marker for today, where "now" exists. */
+    var daylight = num(day.daylightHours);
+    host.appendChild(metricTile(TILE_ICONS.sun, 'Sunrise & sunset',
+      day.sunriseTime || '—',
+      daylight === null
+        ? (day.sunsetTime ? ('Sets at ' + day.sunsetTime) : '')
+        : (daylight + ' h of daylight'),
+      sunArc(day, isToday ? num(data.currentMin) : null)));
+
+    /* Cloud cover — live only */
+    if (isToday) {
+      host.appendChild(metricTile(TILE_ICONS.cloud, 'Cloud cover',
+        pct(cur.cloud_cover),
+        weatherCodeLabel(cur.weather_code)));
+    }
+  }
+
+  /* ── render: 10-day list ─────────────────────────────── */
+  function renderDays(data, selectedIndex) {
+    var host = $w('wx-days');
+    if (!host) return;
+    clear(host);
+
+    var days = data.days || [];
+    if (!days.length) return;
+
+    /* One shared scale across all ten rows: that is what makes the bars
+       comparable, and a cold snap visible as a shape. */
+    var lo = null, hi = null;
+    for (var s = 0; s < days.length && s < 10; s++) {
+      var dmin = num(days[s].tempMin), dmax = num(days[s].tempMax);
+      if (dmin !== null) lo = (lo === null || dmin < lo) ? dmin : lo;
+      if (dmax !== null) hi = (hi === null || dmax > hi) ? dmax : hi;
+    }
+    /* A flat ten days would divide by zero; give the span a floor. */
+    if (lo === null || hi === null) { lo = 0; hi = 1; }
+    if (hi - lo < 1) hi = lo + 1;
+    var span = hi - lo;
+
+    var nowTemp = num((data.current || {}).temperature_2m);
+
     for (var i = 0; i < days.length && i < 10; i++) {
-      (function (d) {
-        var row = document.createElement('div');
-        row.className = 'weather-day-row';
+      (function (d, index) {
+        var isToday    = index === 0;
+        var isSelected = index === selectedIndex;
 
-        var iconEl = document.createElement('div');
-        iconEl.className = 'weather-day-icon';
-        if (window._wxIcon) iconEl.innerHTML = window._wxIcon(d.weatherCode, 1, 18);
-        row.appendChild(iconEl);
+        /* A real <button>, not a div with a click handler: the rows are
+           the day picker, so they need to be reachable by keyboard and
+           announced as actionable. The CSS resets it back to looking
+           like a row. */
+        var row = el('button', 'wx-day' +
+          (isToday ? ' is-today' : '') +
+          (isSelected ? ' is-selected' : ''));
+        row.type = 'button';
+        row.addEventListener('click', function () { selectDay(index); });
 
-        var nameEl = document.createElement('div');
-        nameEl.className = 'weather-day-name';
-        nameEl.textContent = weekdayLabel(d.date);
-        row.appendChild(nameEl);
+        row.appendChild(el('div', 'wx-day-name', isToday ? 'Today' : (d.weekday || d.date)));
 
-        var summaryWrap = document.createElement('div');
-        summaryWrap.style.cssText = '-webkit-box-flex:1;-webkit-flex:1;flex:1;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;';
-        var summaryEl = document.createElement('div');
-        summaryEl.className = 'weather-day-summary';
-        summaryEl.textContent = weatherCodeLabel(d.weatherCode);
-        summaryWrap.appendChild(summaryEl);
-        if (d.precipProb != null && d.precipProb > 0) {
-          var precipEl = document.createElement('div');
-          precipEl.className = 'weather-day-precip';
-          precipEl.innerHTML = (window._wxRainIcon ? window._wxRainIcon(9) : '') + '<span>' + Math.round(d.precipProb) + '%</span>';
-          summaryWrap.appendChild(precipEl);
+        var ico = el('div', 'wx-day-icon');
+        if (window._wxIcon) ico.innerHTML = window._wxIcon(d.weatherCode, 1, 20);
+        row.appendChild(ico);
+
+        row.appendChild(el('div', 'wx-day-precip',
+          (num(d.precipProb) !== null && d.precipProb >= 10) ? Math.round(d.precipProb) + '%' : ''));
+
+        row.appendChild(el('div', 'wx-day-lo', temp(d.tempMin)));
+
+        var bar = el('div', 'wx-day-bar');
+        var dmin2 = num(d.tempMin), dmax2 = num(d.tempMax);
+        if (dmin2 !== null && dmax2 !== null) {
+          var left  = ((dmin2 - lo) / span) * 100;
+          var width = ((dmax2 - dmin2) / span) * 100;
+          var fill  = el('div', 'wx-day-bar-fill');
+          fill.style.left  = left + '%';
+          /* Keep a sliver visible when min and max coincide. */
+          fill.style.width = Math.max(width, 2) + '%';
+          bar.appendChild(fill);
+
+          if (isToday && nowTemp !== null) {
+            var marker = el('div', 'wx-day-bar-now');
+            marker.style.left = Math.max(0, Math.min(100, ((nowTemp - lo) / span) * 100)) + '%';
+            bar.appendChild(marker);
+          }
         }
-        row.appendChild(summaryWrap);
+        row.appendChild(bar);
 
-        var rangeEl = document.createElement('div');
-        rangeEl.className = 'weather-day-range';
-        rangeEl.textContent = temp(d.tempMax) + ' / ' + temp(d.tempMin);
-        row.appendChild(rangeEl);
+        row.appendChild(el('div', 'wx-day-hi', temp(d.tempMax)));
 
-        list.appendChild(row);
-      })(days[i]);
+        host.appendChild(row);
+      })(days[i], i);
     }
   }
 
+  function renderWeather(data, loc) {
+    /* Clamp defensively: a shorter forecast horizon (or a payload from a
+       cache entry written by an older build) must not leave the view
+       pointing at a day that isn't there. */
+    var dayIndex = wx.selectedDayIndex;
+    if (!data.days || dayIndex < 0 || dayIndex >= data.days.length) {
+      dayIndex = 0;
+      wx.selectedDayIndex = 0;
+    }
+
+    $w('weather-subtitle').textContent = locLabel(loc);
+    renderDayBar(data, dayIndex);
+    renderHero(data, loc, dayIndex);
+    renderHours(data, dayIndex);
+    renderMetrics(data, dayIndex);
+    renderDays(data, dayIndex);
+  }
 
   function loadWeatherPage() {
     loadSettingsWeather(function (err) {
@@ -2232,6 +2440,7 @@ if (pinReady) {
     });
   }
 
+  /* ── Settings block ──────────────────────────────────── */
   function initWeatherSettingsBlock() {
     var searchInput = $w('wx-settings-search');
     var resultsEl = $w('wx-settings-results');
@@ -2251,17 +2460,18 @@ if (pinReady) {
     searchInput.addEventListener('input', function () {
       clearTimeout(wx.settingsSearchTimer);
       var q = (searchInput.value || '').trim();
-      if (!q) { resultsEl.innerHTML = ''; return; }
+      if (!q) { clear(resultsEl); return; }
       wx.settingsSearchTimer = setTimeout(function () {
         wxGet('/api/weather/search?q=' + encodeURIComponent(q), function (err, data) {
           if (err || !data) {
-            resultsEl.innerHTML = '<div class="form-hint">An error occurred while searching for location</div>';
+            clear(resultsEl);
+            resultsEl.appendChild(el('div', 'form-hint', 'An error occurred while searching for location'));
             return;
           }
           renderLocationSearchResults(resultsEl, data.locations || [], function (loc) {
             wx.selectedSettingsLocation = loc;
             refreshSelectedLabel();
-            resultsEl.innerHTML = '';
+            clear(resultsEl);
           });
         });
       }, 400);
@@ -2281,35 +2491,46 @@ if (pinReady) {
           return;
         }
         wx.defaultLocation = wx.selectedSettingsLocation;
+        /* A new default replaces any one-off location the tab was
+           showing, otherwise saving appears to do nothing. */
+        wx.transientLocation = null;
         refreshSelectedLabel();
         wxToast('Default location saved ✓');
       });
     });
   }
 
+  /* ── one-off location search on the tab ──────────────── */
   function initMeteoTransientSearch() {
-    $w('weather-other-location').addEventListener('click', function () {
-      $w('weather-search-panel').classList.toggle('hidden');
-    });
-
-    var input = $w('weather-search-input');
+    var toggle  = $w('weather-other-location');
+    var panel   = $w('weather-search-panel');
+    var input   = $w('weather-search-input');
     var results = $w('weather-search-results');
+
+    toggle.addEventListener('click', function () {
+      var opening = panel.classList.contains('hidden');
+      panel.classList.toggle('hidden');
+      if (opening) toggle.classList.add('is-active');
+      else toggle.classList.remove('is-active');
+    });
 
     input.addEventListener('input', function () {
       clearTimeout(wx.meteoSearchTimer);
       var q = (input.value || '').trim();
-      if (!q) { results.innerHTML = ''; return; }
+      if (!q) { clear(results); return; }
       wx.meteoSearchTimer = setTimeout(function () {
         wxGet('/api/weather/search?q=' + encodeURIComponent(q), function (err, data) {
           if (err || !data) {
-            results.innerHTML = '<div class="form-hint">An error occurred while searching for location</div>';
+            clear(results);
+            results.appendChild(el('div', 'form-hint', 'An error occurred while searching for location'));
             return;
           }
           renderLocationSearchResults(results, data.locations || [], function (loc) {
             wx.transientLocation = loc;
             input.value = '';
-            results.innerHTML = '';
-            $w('weather-search-panel').classList.add('hidden');
+            clear(results);
+            panel.classList.add('hidden');
+            toggle.classList.remove('is-active');
             loadForecastForLocation(loc);
           });
         });
@@ -2323,9 +2544,11 @@ if (pinReady) {
 
   $w('weather-refresh-btn').addEventListener('click', function () {
     var loc = wx.transientLocation || wx.defaultLocation;
-    if (loc) {
-      loadForecastForLocation(loc, true);
-    }
+    if (!loc) return;
+    var btn = $w('weather-refresh-btn');
+    btn.classList.add('is-busy');
+    setTimeout(function () { btn.classList.remove('is-busy'); }, 600);
+    loadForecastForLocation(loc, true);
   });
 
   document.querySelector('[data-page="meteo"]').addEventListener('click', function () {
@@ -3469,7 +3692,10 @@ if (pinReady) {
     { key: 'meteo',     label: 'Weather',    page: 'meteo',     tab: 'meteo',     routes: ['/api/weather'] },
     { key: 'jelly',     label: 'Jellyfin',   page: 'jelly',     tab: 'jelly',     routes: ['/api/jf'] },
     { key: 'markets',   label: 'Markets',    page: 'markets',   tab: 'markets',   routes: ['/api/markets'] },
-    { key: 'server',    label: 'Server',     page: 'server',    tab: 'server',    routes: ['/api/proxmox', '/nodes'] }
+    /* The Proxmox router is mounted at /api/px (see backend/server.js), not
+       /api/proxmox — the old value only ever matched by accident, via the
+       '/nodes' substring, so /api/px/status stayed live with Server off. */
+    { key: 'server',    label: 'Server',     page: 'server',    tab: 'server',    routes: ['/api/px'] }
   ];
 
   /* disabled set: keys of features currently off */

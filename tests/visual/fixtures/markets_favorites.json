@@ -1,3 +1,20 @@
 {
-  "items": []
+  "items": [
+    {
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "exchange": "NasdaqGS",
+      "price": 232.14,
+      "change": 1.24,
+      "changePercent": 0.5372
+    },
+    {
+      "symbol": "ENI.MI",
+      "name": "Eni S.p.A.",
+      "exchange": "Milan",
+      "price": 14.382,
+      "change": -0.118,
+      "changePercent": -0.8138
+    }
+  ]
 }

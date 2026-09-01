@@ -101,3 +101,112 @@ describe('GET /api/jf/items', function () {
     return request(app).get('/api/jf/items?userId=u2').expect(500);
   });
 });
+
+describe('GET /api/jf/home-summary', function () {
+  /* home-summary fans out five parallel calls after resolving the user, so
+     the sequential mockFetchOnce queue is too brittle here — match on URL. */
+  function mockFetchByUrl(routes) {
+    fetch.mockImplementation(function (url) {
+      /* Longest fragment wins: the item queries all live under
+         /Users/<id>/Items, so a bare '/Users' key would otherwise
+         swallow every one of them. */
+      var body = null;
+      var found = false;
+      var bestLen = -1;
+      Object.keys(routes).forEach(function (frag) {
+        if (url.indexOf(frag) !== -1 && frag.length > bestLen) {
+          body = routes[frag];
+          bestLen = frag.length;
+          found = true;
+        }
+      });
+      if (!found) {
+        return Promise.resolve({ ok: false, status: 404, json: function () { return Promise.resolve({}); } });
+      }
+      if (body === '__ERROR__') {
+        return Promise.resolve({ ok: false, status: 500, json: function () { return Promise.resolve({}); } });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(body); } });
+    });
+  }
+
+  var USERS = [{ Id: 'u2', Name: 'admin', Policy: { IsAdministrator: true } }];
+
+  test('400 when Jellyfin is not configured', function () {
+    var app = buildApp();
+    return request(app).get('/api/jf/home-summary').expect(400);
+  });
+
+  test('reports library counts, recent movies and the episode total', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    mockFetchByUrl({
+      '/Users': USERS,
+      'IncludeItemTypes=Movie&Recursive=true&Limit=0':   { TotalRecordCount: 214 },
+      'IncludeItemTypes=Series&Recursive=true&Limit=0':  { TotalRecordCount: 37 },
+      'IncludeItemTypes=Episode&Recursive=true&Limit=0': { TotalRecordCount: 1893 },
+      'SortBy=DateCreated': {
+        Items: [{ Id: 'm1', Name: '1917', ProductionYear: 2019, ImageTags: { Primary: 'tag1' } }]
+      },
+      '/Sessions': []
+    });
+
+    var app = buildApp();
+    return request(app).get('/api/jf/home-summary').expect(200).then(function (res) {
+      expect(res.body.totalMovies).toBe(214);
+      expect(res.body.totalSeries).toBe(37);
+      expect(res.body.totalEpisodes).toBe(1893);
+      expect(res.body.recentMovies).toEqual([
+        { id: 'm1', name: '1917', year: 2019, imageTag: 'tag1' }
+      ]);
+      expect(res.body.nowPlaying).toBeNull();
+    });
+  });
+
+  test('surfaces the session that is currently streaming', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    mockFetchByUrl({
+      '/Users': USERS,
+      'IncludeItemTypes=Movie&Recursive=true&Limit=0':   { TotalRecordCount: 1 },
+      'IncludeItemTypes=Series&Recursive=true&Limit=0':  { TotalRecordCount: 1 },
+      'IncludeItemTypes=Episode&Recursive=true&Limit=0': { TotalRecordCount: 1 },
+      'SortBy=DateCreated': { Items: [] },
+      '/Sessions': [
+        { UserName: 'idle', DeviceName: 'TV' },
+        {
+          UserName: 'stefano', DeviceName: 'Living Room',
+          NowPlayingItem: { Id: 'e9', Name: 'Ozymandias', Type: 'Episode', SeriesName: 'Breaking Bad' }
+        }
+      ]
+    });
+
+    var app = buildApp();
+    return request(app).get('/api/jf/home-summary').expect(200).then(function (res) {
+      expect(res.body.nowPlaying).toEqual({
+        id: 'e9', name: 'Ozymandias', type: 'Episode',
+        series: 'Breaking Bad', user: 'stefano', device: 'Living Room'
+      });
+    });
+  });
+
+  /* The episode count and session lookup are extras — losing them must not
+     cost the caller the library counts it came for. */
+  test('still answers when the optional lookups fail', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    mockFetchByUrl({
+      '/Users': USERS,
+      'IncludeItemTypes=Movie&Recursive=true&Limit=0':   { TotalRecordCount: 214 },
+      'IncludeItemTypes=Series&Recursive=true&Limit=0':  { TotalRecordCount: 37 },
+      'IncludeItemTypes=Episode&Recursive=true&Limit=0': '__ERROR__',
+      'SortBy=DateCreated': { Items: [] },
+      '/Sessions': '__ERROR__'
+    });
+
+    var app = buildApp();
+    return request(app).get('/api/jf/home-summary').expect(200).then(function (res) {
+      expect(res.body.totalMovies).toBe(214);
+      expect(res.body.totalSeries).toBe(37);
+      expect(res.body.totalEpisodes).toBeNull();
+      expect(res.body.nowPlaying).toBeNull();
+    });
+  });
+});

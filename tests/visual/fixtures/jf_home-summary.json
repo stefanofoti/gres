@@ -1,0 +1,33 @@
+{
+  "totalMovies": 214,
+  "totalSeries": 37,
+  "recentMovies": [
+    {
+      "id": "8341af8b96a6e829d1c53bd389a2a054",
+      "name": "28 anni dopo",
+      "year": 2025,
+      "imageTag": "eec2aea6d063cc2b68fccd36a397cec8"
+    },
+    {
+      "id": "0835b27529bfc51c88a69fdabd4c89bf",
+      "name": "50 km all'ora",
+      "year": 2024,
+      "imageTag": "a1e7ff610f654746f03abcee829aefc2"
+    },
+    {
+      "id": "97ea56a693456c13a3f4325f6bcd8be5",
+      "name": "1917",
+      "year": 2019,
+      "imageTag": "6982280a75472041422a3999b2b8da39"
+    }
+  ],
+  "totalEpisodes": 1893,
+  "nowPlaying": {
+    "id": "8341af8b96a6e829d1c53bd389a2a054",
+    "name": "28 anni dopo",
+    "type": "Movie",
+    "series": null,
+    "user": "stefano",
+    "device": "Salotto"
+  }
+}

@@ -13,7 +13,18 @@
 var fs = require('fs');
 var path = require('path');
 
-var APP_JS_SRC = fs.readFileSync(path.join(__dirname, '../../frontend/js/app.js'), 'utf8');
+/* Every file in frontend/js/ ships to the device, so the guardrails below
+   must read the directory rather than a single path — a new module added
+   later would otherwise be entirely unchecked. */
+var JS_DIR = path.join(__dirname, '../../frontend/js');
+var JS_FILES = fs.readdirSync(JS_DIR).filter(function (f) {
+  return /\.js$/.test(f);
+}).sort();
+
+var APP_JS_SRC = JS_FILES.map(function (f) {
+  return fs.readFileSync(path.join(JS_DIR, f), 'utf8');
+}).join('\n;\n');
+
 var INDEX_HTML_SRC = fs.readFileSync(path.join(__dirname, '../../frontend/index.html'), 'utf8');
 
 /**
@@ -83,5 +94,16 @@ describe('frontend/index.html script loading stays iOS 9 safe', function () {
     var scriptTags = INDEX_HTML_SRC.match(/<script[^>]*src=["'][^"']*app\.js["'][^>]*>/i);
     expect(scriptTags).not.toBeNull();
     expect(scriptTags[0]).not.toMatch(/\btype=["']module["']/i);
+  });
+
+  /* There is no module system here — load order IS the dependency graph.
+     app.js's HOME module reads window._WIDGETS, so widgets.js has to have
+     been evaluated first or the Home grid renders empty. */
+  test('widgets.js is loaded before app.js', function () {
+    var widgetsAt = INDEX_HTML_SRC.search(/<script[^>]*src=["'][^"']*widgets\.js["']/i);
+    var appAt     = INDEX_HTML_SRC.search(/<script[^>]*src=["'][^"']*app\.js["']/i);
+    expect(widgetsAt).toBeGreaterThan(-1);
+    expect(appAt).toBeGreaterThan(-1);
+    expect(widgetsAt).toBeLessThan(appAt);
   });
 });

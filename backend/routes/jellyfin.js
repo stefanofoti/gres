@@ -364,7 +364,7 @@ router.get('/home-summary', function (req, res) {
     }
     var uid = user.Id;
     var base = '/Users/' + uid + '/Items';
-    var done = 0, total = 3;
+    var done = 0, total = 5;
     var results = {};
     var failed = null;
 
@@ -374,11 +374,20 @@ router.get('/home-summary', function (req, res) {
       done++;
       if (done === total) {
         res.json({
-          totalMovies:  results.totalMovies,
-          totalSeries:  results.totalSeries,
-          recentMovies: results.recentMovies
+          totalMovies:   results.totalMovies,
+          totalSeries:   results.totalSeries,
+          totalEpisodes: results.totalEpisodes,
+          recentMovies:  results.recentMovies,
+          nowPlaying:    results.nowPlaying
         });
       }
+    }
+
+    /* The episode count and the session lookup are extras: if either
+       fails, the card should still show the library it does know about,
+       so they resolve to null instead of failing the whole request. */
+    function finishOptional(key, e, val) {
+      finish(key, e ? null : val);
     }
 
     function fail(e) {
@@ -423,6 +432,31 @@ router.get('/home-summary', function (req, res) {
         };
       });
       finish('recentMovies', items);
+    });
+
+    /* count episodes */
+    jfFetch(base + '?IncludeItemTypes=Episode&Recursive=true&Limit=0', cfg, function (e, d) {
+      finishOptional('totalEpisodes', e, (d && d.TotalRecordCount) || 0);
+    });
+
+    /* whatever is streaming right now, if anything */
+    jfFetch('/Sessions', cfg, function (e, sessions) {
+      if (e || !Array.isArray(sessions)) return finishOptional('nowPlaying', e || 'no sessions', null);
+
+      for (var i = 0; i < sessions.length; i++) {
+        var np = sessions[i].NowPlayingItem;
+        if (!np) continue;
+        return finish('nowPlaying', {
+          id:     np.Id,
+          name:   np.Name,
+          type:   np.Type || null,
+          /* Episodes are far more useful with their series name attached */
+          series: np.SeriesName || null,
+          user:   sessions[i].UserName || null,
+          device: sessions[i].DeviceName || null
+        });
+      }
+      finish('nowPlaying', null);
     });
   });
 });
