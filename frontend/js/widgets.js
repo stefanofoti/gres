@@ -663,9 +663,14 @@
 
     if (item && item.id) {
       /* Swap the fallback for the artwork only once it has actually
-         decoded, so a slow or missing cover never leaves a blank tile. */
+         decoded, so a slow or missing cover never leaves a blank tile.
+         The fallback is an opaque, absolutely-positioned layer, so it
+         must be hidden or the artwork stays hidden behind it. */
       var img = new Image();
-      img.onload = function () { div.style.backgroundImage = 'url(' + img.src + ')'; };
+      img.onload = function () {
+        div.style.backgroundImage = 'url(' + img.src + ')';
+        fb.style.display = 'none';
+      };
       img.src = '/api/jf/image/' + item.id + '?type=Primary&maxH=220';
     }
     if (item) {
