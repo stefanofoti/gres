@@ -385,7 +385,7 @@ if (pinReady) {
     window._currentPage = id;
     // Load page-specific data if needed
     if (id === 'smarthome') loadSmartHome(false);
-    if (id === 'settings')  loadSettings();
+    if (id === 'settings')  { loadSettings(); loadAdminSettings(); }
   }
 
   /* Settings tab gate — uses the 'settings' scope, cached for the page
@@ -1164,9 +1164,6 @@ if (pinReady) {
   function loadSettings() {
     xhr('GET', API + '/api/settings', null, function (err, data) {
       if (!data) return;
-      /* HA fields — handled here in the main module */
-      if (data.ha_url)   $('ha-url').value   = data.ha_url;
-      if (data.ha_token) $('ha-token').value = data.ha_token;
       /* Notify every registered module callback */
       var cbs = window._settingsCallbacks;
       for (var i = 0; i < cbs.length; i++) {
@@ -1174,6 +1171,43 @@ if (pinReady) {
       }
     });
   }
+
+  /* ── Admin settings ─────────────────────────────────────
+     Service URLs and a set/unset flag per credential, behind the
+     settings scope. Fetched only when the Settings tab opens,
+     because nothing outside those forms needs it — and the tokens
+     themselves are never in the response at all.             */
+  window._adminCallbacks = window._adminCallbacks || [];
+  window._onAdminSettingsLoad = function (fn) {
+    window._adminCallbacks.push(fn);
+  };
+
+  function loadAdminSettings() {
+    xhr('GET', API + '/api/settings/admin', null, function (err, data) {
+      if (err || !data) return;
+      var cbs = window._adminCallbacks;
+      for (var i = 0; i < cbs.length; i++) {
+        try { cbs[i](data); } catch (e) { /* keep going */ }
+      }
+    });
+  }
+
+  /**
+   * Show a credential input as "already configured" without ever holding
+   * the value. An empty field on save means "keep what is stored"; only a
+   * value the user typed is transmitted.
+   *
+   * @param {HTMLInputElement} input
+   * @param {boolean} isSet
+   */
+  window._markCredential = function (input, isSet) {
+    if (!input) return;
+    if (!input.getAttribute('data-ph')) {
+      input.setAttribute('data-ph', input.getAttribute('placeholder') || '');
+    }
+    input.value = '';
+    input.placeholder = isSet ? '•••••••••••• (saved)' : input.getAttribute('data-ph');
+  };
 
   /* ── Smart device protection ────────────────────────────
      A device is "locked" when its entity_id is listed in the
@@ -1214,23 +1248,68 @@ if (pinReady) {
       'Enter the PIN to control this device.', action, onCancel);
   };
 
-  $('btn-save-ha').addEventListener('click', function () {
+  /**
+   * Same idea for Proxmox power operations, which the backend gates on the
+   * 'server' scope. Prompted every time rather than cached: shutting down a
+   * node or stopping a VM is destructive and rare.
+   *
+   * openPinPrompt asks the backend whether the scope is protected first, so
+   * with no SERVER_PIN configured this runs `action` immediately and the tab
+   * behaves exactly as before.
+   *
+   * @param {string}   title    what is about to happen
+   * @param {Function} action   called with no args once authorised
+   * @param {Function} [onCancel]
+   */
+  window._guardServerAction = function (title, action, onCancel) {
+    window._openPinPrompt('server', title,
+      'Enter the PIN to control the server.', action, onCancel);
+  };
+
+  /* Whether a token is already stored. The value itself never arrives. */
+  var haTokenSet = false;
+
+  window._onAdminSettingsLoad(function (d) {
+    if (d.ha_url) $('ha-url').value = d.ha_url;
+    haTokenSet = !!d.ha_token_set;
+    window._markCredential($('ha-token'), haTokenSet);
+  });
+
+  /**
+   * Build the save body, omitting the token when the field was left empty
+   * and one is already stored — otherwise an untouched form would
+   * overwrite a saved token with an empty string.
+   *
+   * @returns {Object|null} null when the form is incomplete.
+   */
+  function haCredentialBody() {
     var url   = ($('ha-url').value   || '').trim().replace(/\/$/, '');
     var token = ($('ha-token').value || '').trim();
-    if (!url)   { toast('Enter server URL'); return; }
-    if (!token) { toast('Enter the token');       return; }
-    xhr('POST', API + '/api/settings', { ha_url: url, ha_token: token }, function (err) {
-      err ? toast('Error: ' + err) : (toast('Saved ✓'), checkHA());
+    if (!url) { toast('Enter server URL'); return null; }
+    if (!token && !haTokenSet) { toast('Enter the token'); return null; }
+    var body = { ha_url: url };
+    if (token) body.ha_token = token;
+    return body;
+  }
+
+  $('btn-save-ha').addEventListener('click', function () {
+    var body = haCredentialBody();
+    if (!body) return;
+    xhr('POST', API + '/api/settings', body, function (err) {
+      if (err) { toast('Error: ' + err); return; }
+      haTokenSet = true;
+      window._markCredential($('ha-token'), true);
+      toast('Saved ✓');
+      checkHA();
     });
   });
 
   $('btn-test-ha').addEventListener('click', function () {
-    var url   = ($('ha-url').value   || '').trim().replace(/\/$/, '');
-    var token = ($('ha-token').value || '').trim();
-    var res   = $('ha-test-result');
+    var res = $('ha-test-result');
     res.className = 'test-result hidden';
-    if (!url || !token) { toast('Fill in URL and token first'); return; }
-    xhr('POST', API + '/api/settings', { ha_url: url, ha_token: token }, function () {
+    var body = haCredentialBody();
+    if (!body) return;
+    xhr('POST', API + '/api/settings', body, function () {
       xhr('GET', API + '/api/ha/status', null, function (err, data) {
         res.classList.remove('hidden');
         if (!err && data && data.connected) {
@@ -2888,14 +2967,30 @@ if (pinReady) {
   }
 
   /* ── settings: Jellyfin save & test ────────────────── */
-  $j('btn-save-jf').addEventListener('click', function () {
+  /* Whether an API key is already stored. The value itself never arrives. */
+  var jfTokenSet = false;
+
+  /**
+   * @returns {Object|null} save body, or null when the form is incomplete.
+   */
+  function jfCredentialBody() {
     var url   = ($j('jf-url').value   || '').trim().replace(/\/$/, '');
     var token = ($j('jf-token').value || '').trim();
-    if (!url)   { jfToast('Enter server URL'); return; }
-    if (!token) { jfToast('Enter the API token');   return; }
-    jfPost('/api/settings', { jf_url: url, jf_token: token }, function (err) {
+    if (!url) { jfToast('Enter server URL'); return null; }
+    if (!token && !jfTokenSet) { jfToast('Enter the API token'); return null; }
+    var body = { jf_url: url };
+    if (token) body.jf_token = token;
+    return body;
+  }
+
+  $j('btn-save-jf').addEventListener('click', function () {
+    var body = jfCredentialBody();
+    if (!body) return;
+    jfPost('/api/settings', body, function (err) {
       if (err) jfToast('Error: ' + err);
       else {
+        jfTokenSet = true;
+        window._markCredential($j('jf-token'), true);
         jfToast('Jellyfin saved ✓');
         jf.userId = null; // reset cache
       }
@@ -2903,12 +2998,11 @@ if (pinReady) {
   });
 
   $j('btn-test-jf').addEventListener('click', function () {
-    var url   = ($j('jf-url').value   || '').trim().replace(/\/$/, '');
-    var token = ($j('jf-token').value || '').trim();
-    var res   = $j('jf-test-result');
+    var res = $j('jf-test-result');
     res.className = 'test-result hidden';
-    if (!url || !token) { jfToast('Fill in URL and token first'); return; }
-    jfPost('/api/settings', { jf_url: url, jf_token: token }, function () {
+    var body = jfCredentialBody();
+    if (!body) return;
+    jfPost('/api/settings', body, function () {
       jfXhr('/api/jf/status', function (err, data) {
         res.classList.remove('hidden');
         if (!err && data && data.connected) {
@@ -2929,10 +3023,12 @@ if (pinReady) {
     i.type = i.type === 'password' ? 'text' : 'password';
   });
 
-  /* Jellyfin registers itself with the central settings loader */
-  window._onSettingsLoad(function (data) {
-    if (data.jf_url)   $j('jf-url').value   = data.jf_url;
-    if (data.jf_token) $j('jf-token').value = data.jf_token;
+  /* Jellyfin registers itself with the admin settings loader — the URL is
+     configuration, the key is reported only as set or unset. */
+  window._onAdminSettingsLoad(function (data) {
+    if (data.jf_url) $j('jf-url').value = data.jf_url;
+    jfTokenSet = !!data.jf_token_set;
+    window._markCredential($j('jf-token'), jfTokenSet);
   });
 
   /* Re-fetch on rotation only if the column bracket actually changed and the
@@ -3231,12 +3327,17 @@ if (pinReady) {
             (action === 'reboot' ? 'Riavvio' : 'Spegnimento') + ' nodo',
             'Vuoi davvero ' + label + ' il nodo ' + nodeName + '?',
             function() {
-              btn.disabled = true;
-              pxPost('/nodes/' + nodeName + '/power', { command: action }, function(err) {
-                btn.disabled = false;
-                if (err) pxToast('Error: ' + err);
-                else     pxToast('Command sent: ' + action);
-              });
+              window._guardServerAction(
+                (action === 'reboot' ? 'Reboot' : 'Shut down') + ' node',
+                function () {
+                  btn.disabled = true;
+                  pxPost('/nodes/' + nodeName + '/power', { command: action }, function(err) {
+                    btn.disabled = false;
+                    if (err) pxToast('Error: ' + err);
+                    else     pxToast('Command sent: ' + action);
+                  });
+                }
+              );
             }
           );
         });
@@ -3417,13 +3518,15 @@ if (pinReady) {
   }
 
   function doVMAction(nodeName, vmid, vmType, action, detail) {
-    pxPost('/nodes/' + nodeName + '/' + vmType + '/' + vmid + '/action', { action: action }, function(err) {
-      if (err) { pxToast('Error: ' + err); return; }
-      pxToast('Command "' + action + '" sent');
-      // reload status after short delay
-      setTimeout(function () {
-        selectVM(nodeName, vmid, vmType, {});
-      }, 2500);
+    window._guardServerAction('VM ' + action, function () {
+      pxPost('/nodes/' + nodeName + '/' + vmType + '/' + vmid + '/action', { action: action }, function(err) {
+        if (err) { pxToast('Error: ' + err); return; }
+        pxToast('Command "' + action + '" sent');
+        // reload status after short delay
+        setTimeout(function () {
+          selectVM(nodeName, vmid, vmType, {});
+        }, 2500);
+      });
     });
   }
 
@@ -3622,27 +3725,44 @@ if (pinReady) {
   }
 
   /* ── Settings: Proxmox save & test ─────────────────── */
-  $p('btn-save-px').addEventListener('click', function () {
+  /* Whether a token secret is already stored. The value never arrives. */
+  var pxTokenSet = false;
+
+  /**
+   * @returns {Object|null} save body, or null when the form is incomplete.
+   */
+  function pxCredentialBody() {
     var url     = ($p('px-url').value     || '').trim().replace(/\/$/, '');
     var tokenid = ($p('px-tokenid').value || '').trim();
     var token   = ($p('px-token').value   || '').trim();
-    if (!url)     { pxToast('Enter server URL'); return; }
-    if (!tokenid) { pxToast('Enter the Token ID');   return; }
-    if (!token)   { pxToast('Enter the Token Secret'); return; }
-    pxPostSettings({ px_url: url, px_tokenid: tokenid, px_token: token }, function(err) {
+    if (!url)     { pxToast('Enter server URL'); return null; }
+    if (!tokenid) { pxToast('Enter the Token ID'); return null; }
+    if (!token && !pxTokenSet) { pxToast('Enter the Token Secret'); return null; }
+    var body = { px_url: url, px_tokenid: tokenid };
+    if (token) body.px_token = token;
+    return body;
+  }
+
+  $p('btn-save-px').addEventListener('click', function () {
+    var body = pxCredentialBody();
+    if (!body) return;
+    pxPostSettings(body, function(err) {
       if (err) pxToast('Error: ' + err);
-      else { pxToast('Proxmox saved ✓'); px.loaded = false; }
+      else {
+        pxTokenSet = true;
+        window._markCredential($p('px-token'), true);
+        pxToast('Proxmox saved ✓');
+        px.loaded = false;
+      }
     });
   });
 
   $p('btn-test-px').addEventListener('click', function () {
-    var url     = ($p('px-url').value     || '').trim().replace(/\/$/, '');
-    var tokenid = ($p('px-tokenid').value || '').trim();
-    var token   = ($p('px-token').value   || '').trim();
-    var res     = $p('px-test-result');
+    var res = $p('px-test-result');
     res.className = 'test-result hidden';
-    if (!url || !tokenid || !token) { pxToast('Fill in all fields first'); return; }
-    pxPostSettings({ px_url: url, px_tokenid: tokenid, px_token: token }, function () {
+    var body = pxCredentialBody();
+    if (!body) return;
+    pxPostSettings(body, function () {
       pxGet('/status', function(err, data) {
         res.classList.remove('hidden');
         if (!err && data && data.connected) {
@@ -3666,11 +3786,13 @@ if (pinReady) {
     loadCluster();
   });
 
-  /* Proxmox registers itself with the central settings loader */
-  window._onSettingsLoad(function (d) {
+  /* Proxmox registers itself with the admin settings loader — URL and token
+     id are configuration, the secret is reported only as set or unset. */
+  window._onAdminSettingsLoad(function (d) {
     if (d.px_url)     $p('px-url').value     = d.px_url;
     if (d.px_tokenid) $p('px-tokenid').value = d.px_tokenid;
-    if (d.px_token)   $p('px-token').value   = d.px_token;
+    pxTokenSet = !!d.px_token_set;
+    window._markCredential($p('px-token'), pxTokenSet);
   });
 
 })();

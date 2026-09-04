@@ -33,15 +33,14 @@
 var express = require('express');
 var router  = express.Router();
 var crypto  = require('crypto');
+var session = require('../middleware/session');
 
 var MAX_ATTEMPTS = 5;
 var LOCKOUT_MS   = 5 * 60 * 1000; /* 5 minutes */
 
-/* Map of supported scopes -> environment variable name */
-var SCOPE_ENV = {
-  settings: 'SETTINGS_PIN',
-  devices:  'DEVICES_PIN'
-};
+/* Scope -> environment variable mapping lives with the session middleware,
+   which is what actually enforces a scope; this route only grants one. */
+var SCOPE_ENV = session.SCOPE_ENV;
 
 /* In-memory attempt tracker: { "ip|scope": { count, firstAt } } */
 var attempts = {};
@@ -66,10 +65,7 @@ function normalizeScope(raw) {
  * @returns {string} the PIN, or '' if not configured.
  */
 function getConfiguredPin(scope) {
-  var envName = SCOPE_ENV[normalizeScope(scope)];
-  var raw = process.env[envName];
-  if (raw === undefined || raw === null) return '';
-  return String(raw).trim();
+  return session.getConfiguredPin(normalizeScope(scope));
 }
 
 /**
@@ -163,7 +159,9 @@ router.post('/verify-pin', function (req, res) {
   var scope      = normalizeScope(req.body && req.body.scope);
   var configured = getConfiguredPin(scope);
 
-  /* No PIN configured for this scope -> nothing to verify, always allow. */
+  /* No PIN configured for this scope -> nothing to verify, always allow.
+     No cookie either: requireScope() lets an unprotected scope straight
+     through, so there is nothing for a session to carry. */
   if (!configured) {
     return res.json({ ok: true });
   }
@@ -180,7 +178,11 @@ router.post('/verify-pin', function (req, res) {
 
   if (ok) {
     clearFailures(key);
-    req.log.info({ scope: scope }, 'PIN verified');
+    /* Turn the verified PIN into something later requests can present.
+       Without this the gate is advisory and the API stays open to anyone
+       who skips the UI. */
+    session.grantScope(req, res, scope);
+    req.log.info({ scope: scope }, 'PIN verified, scope granted');
     return res.json({ ok: true });
   }
 

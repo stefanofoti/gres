@@ -64,12 +64,27 @@ docker compose up -d      # re-reads .env
 | `PORT` | `3000` | Host port gres is published on |
 | `LOG_LEVEL` | `warn` | `error`, `warn`, `info` or `debug` |
 | `HA_REFRESH_INTERVAL_SEC` | `15` | Home Assistant poll interval; `0` disables polling |
-| `SETTINGS_PIN` | *unset* | Numeric PIN to open the Settings tab |
+| `SETTINGS_PIN` | *unset* | Numeric PIN for the Settings tab, your stored credentials, and any change to settings |
 | `DEVICES_PIN` | *unset* | Numeric PIN to control devices you have flagged as protected |
+| `SERVER_PIN` | *unset* | Numeric PIN for Proxmox power actions — node shutdown/reboot, VM start/stop |
+| `SESSION_SECRET` | *generated* | Signing key for session cookies; generated into the data volume on first boot |
+| `TRUST_PROXY` | *unset* | Set to `1` if gres runs behind one reverse proxy, so rate limiting and PIN lockout see the real client IP |
 
-Both PINs are off unless you set them. They are independent, so they can
-share a code or differ, and neither is ever sent to the browser — gres
-only answers whether a guess matched.
+All three PINs are off unless you set them. They are independent, so they
+can share a code or differ, and none is ever sent to the browser — gres
+only answers whether a guess matched, then remembers the match in a signed
+`HttpOnly` cookie.
+
+The gates are enforced by the server, not the page, so skipping the
+interface does not skip the PIN. Reading stays open in every case: with
+`SERVER_PIN` set the Server tab still renders, it just will not shut
+anything down.
+
+**A scope with no PIN set is not protected.** That keeps the install above
+working with no configuration, and it is the right default on a trusted
+home network. If gres is reachable by anyone you would not hand the remote
+to, set at least `SETTINGS_PIN`, and do not expose it to the internet
+without putting authentication in front of it.
 
 ### Updating
 
