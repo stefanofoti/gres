@@ -24,6 +24,7 @@ var router  = express.Router();
 var fetch   = require('node-fetch');
 var fs      = require('fs');
 var path    = require('path');
+var session = require('../middleware/session');
 
 var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
 /**
@@ -129,6 +130,78 @@ function fetchRelevantEntities(config, domain) {
       if (!Array.isArray(entities)) throw new Error('Invalid response from HA');
       return filterRelevantEntities(entities, domain);
     });
+}
+
+/* ── Device protection ──────────────────────────────────
+   Entities the user flagged in Settings -> "Smart device protection".
+   This check used to live only in the frontend, which meant the lock was
+   advisory: a direct POST to /service toggled a protected device with no
+   PIN at all. Enforcement belongs here; the frontend guard stays as the
+   prompt that appears before the request is made.                      */
+
+/**
+ * @returns {Array<string>} entity ids flagged as protected.
+ */
+function getProtectedEntities() {
+  try {
+    var s = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    return Array.isArray(s.ha_protected_entities) ? s.ha_protected_entities : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Collect every entity id named by a service call. Home Assistant accepts
+ * three shapes and the frontend is not the only possible caller, so all
+ * three are read: service_data.entity_id as a string, as an array, and
+ * service_data.target.entity_id in either form.
+ *
+ * @param {Object} serviceData
+ * @returns {Array<string>}
+ */
+function entityIdsIn(serviceData) {
+  var out = [];
+
+  function collect(v) {
+    if (!v) return;
+    if (typeof v === 'string') { out.push(v); return; }
+    if (Array.isArray(v)) {
+      for (var i = 0; i < v.length; i++) {
+        if (typeof v[i] === 'string') out.push(v[i]);
+      }
+    }
+  }
+
+  if (serviceData) {
+    collect(serviceData.entity_id);
+    if (serviceData.target) collect(serviceData.target.entity_id);
+  }
+  return out;
+}
+
+/**
+ * True when a service call needs the 'devices' scope.
+ *
+ * Calls that name no entity at all fail closed whenever anything is
+ * protected: Home Assistant can target by area or device, and gres's own
+ * frontend always sends an entity id, so refusing costs nothing and closes
+ * the obvious way around the check.
+ *
+ * @param {Object} serviceData
+ * @returns {boolean}
+ */
+function callNeedsDeviceScope(serviceData) {
+  var protectedIds = getProtectedEntities();
+  if (!protectedIds.length) return false;
+
+  var named = entityIdsIn(serviceData);
+  if (!named.length) return true;
+
+  for (var i = 0; i < named.length; i++) {
+    if (protectedIds.indexOf(named[i]) !== -1) return true;
+  }
+  return false;
 }
 
 /* ── Routes ─────────────────────────────────────────────── */
@@ -249,6 +322,14 @@ router.post('/service', function (req, res) {
 
   if (!domain || !service) {
     return res.status(400).json({ error: 'domain and service are required' });
+  }
+
+  if (session.isScopeRequired('devices') &&
+      callNeedsDeviceScope(serviceData) &&
+      !session.hasScope(req, 'devices')) {
+    req.log.warn({ domain: domain, service: service, entityId: serviceData.entity_id },
+      'service call refused: protected device, no devices scope');
+    return res.status(401).json({ error: 'PIN required', scope: 'devices' });
   }
 
   req.log.info({ domain: domain, service: service, entityId: serviceData.entity_id },

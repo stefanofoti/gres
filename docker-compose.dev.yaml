@@ -28,6 +28,8 @@ services:
       HA_REFRESH_INTERVAL_SEC: ${HA_REFRESH_INTERVAL_SEC:-15}
       SETTINGS_PIN: ${SETTINGS_PIN:-}
       DEVICES_PIN: ${DEVICES_PIN:-}
+      SERVER_PIN: ${SERVER_PIN:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
 
     networks:
       - gres-network

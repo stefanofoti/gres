@@ -9,7 +9,8 @@
  * Run with the app served on http://localhost:3000:
  *   node tests/visual/capture-fixtures.js
  *
- * SECURITY: /api/settings returns real integration credentials (Home
+ * SECURITY: /api/settings/admin returns real service URLs, and older builds
+ * returned integration credentials from /api/settings too (Home
  * Assistant long-lived token, Jellyfin API key, Proxmox token secret) and
  * internal LAN URLs. Those are REDACTED here before anything touches disk —
  * fixtures are git-tracked, backend/data/ is not. Redacted values keep the

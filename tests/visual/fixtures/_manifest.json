@@ -108,6 +108,12 @@
     "status": 200
   },
   {
+    "file": "settings_admin.json",
+    "path": "/api/settings/admin",
+    "search": "",
+    "status": 200
+  },
+  {
     "file": "weather_forecast_lat_45.46427_lon_9.18951_timezone_Europe_2FRome.json",
     "path": "/api/weather/forecast",
     "search": "?lat=45.46427&lon=9.18951&timezone=Europe%2FRome",

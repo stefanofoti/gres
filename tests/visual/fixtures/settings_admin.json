@@ -1,0 +1,9 @@
+{
+  "ha_url": "http://homeassistant.local:8123",
+  "jf_url": "http://jellyfin.local:8096",
+  "px_url": "https://proxmox.local:8006",
+  "px_tokenid": "root@pam!fake",
+  "ha_token_set": true,
+  "jf_token_set": true,
+  "px_token_set": true
+}

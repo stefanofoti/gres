@@ -8,13 +8,6 @@
     "longitude": 9.18951,
     "timezone": "Europe/Rome"
   },
-  "ha_url": "http://homeassistant.local:8123",
-  "ha_token": "REDACTED-ha-token-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "jf_url": "http://jellyfin.local:8096",
-  "jf_token": "REDACTED-jf-keyxxxxxxxxxxxxxxxxx",
-  "px_url": "https://proxmox.local:8006",
-  "px_tokenid": "root@pam!fake",
-  "px_token": "REDACTED-px-secret-0000-0000-000000",
   "home_widgets": [
     {
       "type": "smarthome",

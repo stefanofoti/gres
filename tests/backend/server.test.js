@@ -94,6 +94,40 @@ test('API routes are reachable and return JSON', function () {
   });
 });
 
+test('no CORS headers are sent, so another origin cannot read the API', function () {
+  /* The wildcard this used to send let any page open in any browser on the
+     network drive the whole API cross-origin and read the responses. */
+  return request(baseUrl)
+    .get('/api/settings')
+    .set('Origin', 'http://evil.example')
+    .expect(200)
+    .then(function (res) {
+      expect(res.headers['access-control-allow-origin']).toBeUndefined();
+      expect(res.headers['access-control-allow-credentials']).toBeUndefined();
+    });
+});
+
+test('unmatched /api paths return a JSON 404, not the app shell', function () {
+  /* Falling through to index.html returned HTML with HTTP 200; the client's
+     JSON.parse then failed and surfaced "Invalid response", which reads as a
+     backend fault rather than a wrong URL. */
+  return request(baseUrl)
+    .get('/api/does-not-exist')
+    .expect(404)
+    .expect('Content-Type', /json/)
+    .then(function (res) {
+      expect(res.body).toHaveProperty('error');
+    });
+});
+
+test('an unknown method on a real API prefix also 404s as JSON', function () {
+  return request(baseUrl)
+    .post('/api/config/nope')
+    .send({})
+    .expect(404)
+    .expect('Content-Type', /json/);
+});
+
 test('the global error handler returns structured JSON for a malformed JSON body', function () {
   return request(baseUrl)
     .post('/api/settings')

@@ -18,10 +18,10 @@
  *   GET  /api/px/home-summary                    — cluster roll-up for the Home widget
  *   GET  /api/px/nodes                           — cluster node list
  *   GET  /api/px/nodes/:node/status              — node hardware stats
- *   POST /api/px/nodes/:node/power               — shutdown | reboot node
+ *   POST /api/px/nodes/:node/power               — shutdown | reboot node  [scope: server]
  *   GET  /api/px/nodes/:node/vms                 — QEMU + LXC list
  *   GET  /api/px/nodes/:node/:type/:vmid/status  — VM live stats
- *   POST /api/px/nodes/:node/:type/:vmid/action  — start|stop|shutdown|reset|suspend|resume
+ *   POST /api/px/nodes/:node/:type/:vmid/action  — start|stop|… [scope: server]
  *   GET  /api/px/nodes/:node/storage             — storage volumes
  *   GET  /api/px/nodes/:node/rrd                 — node RRD time-series
  *   GET  /api/px/nodes/:node/:type/:vmid/rrd     — VM RRD time-series
@@ -37,6 +37,7 @@ var http    = require('http');
 var fs      = require('fs');
 var path    = require('path');
 var url     = require('url');
+var session = require('../middleware/session');
 
 var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
 
@@ -316,7 +317,7 @@ router.get('/nodes/:node/status', function (req, res) {
  *
  * Body: { command: 'shutdown' | 'reboot' }
  */
-router.post('/nodes/:node/power', function (req, res) {
+router.post('/nodes/:node/power', session.requireScope('server'), function (req, res) {
   var cfg     = getPXConfig();
   var node    = req.params.node;
   var command = req.body.command;
@@ -413,7 +414,7 @@ router.get('/nodes/:node/:type/:vmid/status', function (req, res) {
  *
  * Body: { action: 'start'|'stop'|'shutdown'|'reset'|'suspend'|'resume' }
  */
-router.post('/nodes/:node/:type/:vmid/action', function (req, res) {
+router.post('/nodes/:node/:type/:vmid/action', session.requireScope('server'), function (req, res) {
   var cfg    = getPXConfig();
   var p      = req.params;
   var action = req.body.action;

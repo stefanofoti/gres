@@ -203,22 +203,183 @@ describe('device lock API (window._isDeviceLocked / _setDeviceLocked / _guardDev
   });
 });
 
-describe('settings load (GET /api/settings)', function () {
-  test('populates the HA form fields and fans out to registered module callbacks', function () {
+describe('settings load', function () {
+  /*
+   * Since 0.0.9 the boot-time read carries public UI state only, and the
+   * credential forms are filled from a separate scoped read that reports each
+   * token as set or unset without ever carrying its value.
+   */
+
+  test('the public read fans out to registered module callbacks', function () {
     loadApp(function (method, url) {
       if (method === 'GET' && url.indexOf('/api/settings') !== -1) {
         return {
           status: 200,
-          body: { ha_url: 'http://ha.local:8123', ha_token: 'tok123', ha_protected_entities: ['light.kitchen'] }
+          body: { ha_protected_entities: ['light.kitchen'] }
         };
       }
       return mockXhrHelper.defaultRouteHandler(method, url);
     });
     return flush().then(function () {
-      expect(document.getElementById('ha-url').value).toBe('http://ha.local:8123');
-      expect(document.getElementById('ha-token').value).toBe('tok123');
       /* the device-lock module registers via window._onSettingsLoad */
       expect(window._isDeviceLocked('light.kitchen')).toBe(true);
+    });
+  });
+
+  test('the boot read does not request the scoped admin endpoint', function () {
+    var asked = [];
+    loadApp(function (method, url) {
+      if (method === 'GET' && url.indexOf('/api/settings') !== -1) {
+        asked.push(url);
+        return { status: 200, body: {} };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url);
+    });
+    return flush().then(function () {
+      /* Nothing outside the Settings forms needs it, and asking for it on
+         every page load would prompt for a PIN the user has not asked for. */
+      expect(asked.length).toBeGreaterThan(0);
+      asked.forEach(function (u) {
+        expect(u.indexOf('/api/settings/admin')).toBe(-1);
+      });
+    });
+  });
+
+  test('the admin read fills the URL fields and masks the credentials', function () {
+    loadApp(function (method, url) {
+      if (method === 'GET' && url.indexOf('/api/settings/admin') !== -1) {
+        return {
+          status: 200,
+          body: {
+            ha_url: 'http://ha.local:8123',
+            jf_url: 'http://jf.local:8096',
+            px_url: 'https://px.local:8006',
+            px_tokenid: 'root@pam!panel',
+            ha_token_set: true,
+            jf_token_set: true,
+            px_token_set: false
+          }
+        };
+      }
+      if (method === 'GET' && url.indexOf('/api/settings') !== -1) {
+        return { status: 200, body: {} };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url);
+    });
+
+    return flush().then(function () {
+      document.querySelector('[data-page="settings"]').click();
+      return flush();
+    }).then(function () {
+      expect(document.getElementById('ha-url').value).toBe('http://ha.local:8123');
+      expect(document.getElementById('jf-url').value).toBe('http://jf.local:8096');
+      expect(document.getElementById('px-tokenid').value).toBe('root@pam!panel');
+
+      /* A stored token is shown as a placeholder, never as a value. */
+      expect(document.getElementById('ha-token').value).toBe('');
+      expect(document.getElementById('ha-token').placeholder).toContain('saved');
+      expect(document.getElementById('jf-token').placeholder).toContain('saved');
+
+      /* An unset one keeps its original prompt. */
+      expect(document.getElementById('px-token').placeholder).not.toContain('saved');
+    });
+  });
+
+  test('saving with an untouched token field omits the token from the body', function () {
+    var posted = null;
+    loadApp(function (method, url, body) {
+      if (method === 'GET' && url.indexOf('/api/settings/admin') !== -1) {
+        return { status: 200, body: { ha_url: 'http://ha.local:8123', ha_token_set: true } };
+      }
+      if (method === 'POST' && url.indexOf('/api/settings') !== -1) {
+        /* window._xhr sends a JSON string, not an object. */
+        posted = JSON.parse(body);
+        return { status: 200, body: { success: true, settings: {} } };
+      }
+      if (method === 'GET' && url.indexOf('/api/settings') !== -1) {
+        return { status: 200, body: {} };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url);
+    });
+
+    return flush().then(function () {
+      document.querySelector('[data-page="settings"]').click();
+      return flush();
+    }).then(function () {
+      document.getElementById('btn-save-ha').click();
+      return flush();
+    }).then(function () {
+      /* Leaving the field empty means "keep what is stored" — sending an
+         empty string would wipe a working token. */
+      expect(posted).not.toBeNull();
+      expect(posted.ha_url).toBe('http://ha.local:8123');
+      expect(posted).not.toHaveProperty('ha_token');
+    });
+  });
+
+  test('saving a typed token does include it', function () {
+    var posted = null;
+    loadApp(function (method, url, body) {
+      if (method === 'GET' && url.indexOf('/api/settings/admin') !== -1) {
+        return { status: 200, body: { ha_url: 'http://ha.local:8123', ha_token_set: true } };
+      }
+      if (method === 'POST' && url.indexOf('/api/settings') !== -1) {
+        /* window._xhr sends a JSON string, not an object. */
+        posted = JSON.parse(body);
+        return { status: 200, body: { success: true, settings: {} } };
+      }
+      if (method === 'GET' && url.indexOf('/api/settings') !== -1) {
+        return { status: 200, body: {} };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url);
+    });
+
+    return flush().then(function () {
+      document.querySelector('[data-page="settings"]').click();
+      return flush();
+    }).then(function () {
+      document.getElementById('ha-token').value = 'a-new-token';
+      document.getElementById('btn-save-ha').click();
+      return flush();
+    }).then(function () {
+      expect(posted.ha_token).toBe('a-new-token');
+    });
+  });
+});
+
+describe('server-scope guard on Proxmox power actions', function () {
+  /*
+   * The backend gates node power and VM lifecycle on the 'server' scope. The
+   * frontend has to ask for that PIN first, or a configured SERVER_PIN turns
+   * every action button into a 401 with no way for the user to authenticate.
+   */
+
+  test('_guardServerAction runs the action straight through when no PIN is set', function () {
+    loadApp();
+    return flush().then(function () {
+      var ran = false;
+      window._guardServerAction('VM stop', function () { ran = true; });
+      return flush();
+    }).then(function () {
+      expect(document.getElementById('pin-overlay').classList.contains('hidden')).toBe(true);
+    });
+  });
+
+  test('_guardServerAction prompts for the PIN when the scope is protected', function () {
+    loadApp(function (method, url) {
+      if (url.indexOf('/api/auth/pin-status') !== -1 && url.indexOf('scope=server') !== -1) {
+        return { status: 200, body: { required: true, length: 4 } };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url);
+    });
+    return flush().then(function () {
+      var ran = false;
+      window._guardServerAction('Shut down node', function () { ran = true; });
+      return flush().then(function () {
+        expect(ran).toBe(false);
+        expect(document.getElementById('pin-overlay').classList.contains('hidden')).toBe(false);
+        expect(document.getElementById('pin-title').textContent).toBe('Shut down node');
+      });
     });
   });
 });
