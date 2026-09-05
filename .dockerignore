@@ -1,0 +1,12 @@
+.git
+node_modules
+data
+.env
+.env.example
+tests
+test-results
+playwright-report
+docs
+*.md
+.dev/
+.DS_Store
