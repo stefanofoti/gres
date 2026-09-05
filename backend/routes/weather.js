@@ -5,8 +5,8 @@ var router = express.Router();
 var fetch = require('node-fetch');
 var fs   = require('fs');
 var path = require('path');
+var store = require('../lib/settingsStore');
 
-var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
 var CACHE_DIR = path.join(process.cwd(), 'data/cache');
 var CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
@@ -61,9 +61,7 @@ function writeWeatherCache(key, data) {
   }
 }
 
-function readSettings() {
-  try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch(e) { return {}; }
-}
+var readSettings = store.readSettings;
 
 function toNum(v) {
   var n = parseFloat(v);

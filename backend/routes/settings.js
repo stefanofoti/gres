@@ -38,12 +38,8 @@
 
 var express = require('express');
 var router  = express.Router();
-var fs      = require('fs');
-var path    = require('path');
 var session = require('../middleware/session');
-
-/* Path to the persistent settings file */
-var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
+var store   = require('../lib/settingsStore');
 
 /**
  * Keys the frontend needs before anyone has authenticated. Everything not
@@ -74,44 +70,15 @@ var SECRET_KEYS = [
 
 /* ── Helpers ────────────────────────────────────────────── */
 
-/**
- * Ensure the data directory and file exist.
- * Called before every read/write to guard against first-run scenarios.
- */
-function ensureDataDir() {
-  var dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir))       fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify({}));
-}
+var readSettings  = store.readSettings;
+var writeSettings = store.writeSettings;
 
-/**
- * Read and parse the settings file.
- * Returns an empty object on any parse error.
- *
- * @returns {Object} Parsed settings map.
- */
-function readSettings() {
-  ensureDataDir();
-  try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  } catch (e) {
-    return {};
-  }
-}
-
-/**
- * Serialise and write a settings map to disk atomically.
- * Writes to a temp file first, then renames to avoid corruption
- * if two requests arrive concurrently or the process is killed mid-write.
- *
- * @param {Object} data — settings to persist.
- */
-function writeSettings(data) {
-  ensureDataDir();
-  var tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-  fs.renameSync(tmp, DATA_FILE);
-}
+/* Every key POST /api/settings is allowed to write. Anything else in the
+   body is silently dropped rather than merged — the previous unconditional
+   Object.assign(current, req.body) would also have accepted a "__proto__"
+   key, which Object.assign's normal property-set semantics resolve against
+   Object.prototype rather than storing as data. */
+var WRITABLE_KEYS = PUBLIC_KEYS.concat(ADMIN_KEYS, SECRET_KEYS);
 
 /**
  * Project the stored settings down to the public allowlist.
@@ -188,16 +155,25 @@ router.get('/:key', function (req, res) {
   res.json({ key: key, value: value });
 });
 
-/** POST /api/settings — merge body into current settings and persist */
+/** POST /api/settings — merge known keys from the body into settings and persist */
 router.post('/', session.requireScope('settings'), function (req, res) {
+  var body = req.body || {};
   var current = readSettings();
-  /* Shallow merge: new keys overwrite existing ones */
-  var updated = Object.assign(current, req.body);
-  writeSettings(updated);
-  req.log.info({ keys: Object.keys(req.body || {}) }, 'settings updated');
+  var written = [];
+
+  for (var i = 0; i < WRITABLE_KEYS.length; i++) {
+    var key = WRITABLE_KEYS[i];
+    if (Object.prototype.hasOwnProperty.call(body, key)) {
+      current[key] = body[key];
+      written.push(key);
+    }
+  }
+
+  writeSettings(current);
+  req.log.info({ keys: written }, 'settings updated');
   /* Echo the public view only — the old handler returned the whole merged
      store, credentials included, straight back to the browser. */
-  res.json({ success: true, settings: publicView(updated) });
+  res.json({ success: true, settings: publicView(current) });
 });
 
 /** DELETE /api/settings/:key — remove a single key from settings */

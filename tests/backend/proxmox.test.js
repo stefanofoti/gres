@@ -259,3 +259,60 @@ describe('GET /api/px/home-summary', function () {
     });
   });
 });
+
+describe('GET /api/px/nodes/:node/rrd', function () {
+  test('returns the unwrapped RRD series for a node', function () {
+    writePXConfig();
+    currentHandler = jsonHandler(200, [{ time: 1000, cpu: 0.2 }, { time: 1010, cpu: 0.3 }]);
+    var app = buildApp();
+    return request(app).get('/api/px/nodes/pve1/rrd?timeframe=hour').expect(200).then(function (res) {
+      expect(res.body).toEqual([{ time: 1000, cpu: 0.2 }, { time: 1010, cpu: 0.3 }]);
+    });
+  });
+
+  test('500 when the PVE API errors', function () {
+    writePXConfig();
+    currentHandler = function (req, res) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ message: 'rrd failure' }));
+    };
+    var app = buildApp();
+    return request(app).get('/api/px/nodes/pve1/rrd').expect(500);
+  });
+});
+
+describe('GET /api/px/nodes/:node/:type/:vmid/rrd', function () {
+  test('returns the unwrapped RRD series for a VM', function () {
+    writePXConfig();
+    currentHandler = jsonHandler(200, [{ time: 1000, cpu: 0.1, mem: 512 }]);
+    var app = buildApp();
+    return request(app).get('/api/px/nodes/pve1/qemu/100/rrd').expect(200).then(function (res) {
+      expect(res.body).toEqual([{ time: 1000, cpu: 0.1, mem: 512 }]);
+    });
+  });
+});
+
+describe('GET /api/px/nodes/:node/:type/:vmid/vnc-url', function () {
+  test('400 when Proxmox is not configured', function () {
+    var app = buildApp();
+    return request(app).get('/api/px/nodes/pve1/qemu/100/vnc-url').expect(400);
+  });
+
+  test('builds a kvm console URL for a QEMU VM', function () {
+    writePXConfig({ px_url: 'https://pve.local:8006' });
+    var app = buildApp();
+    return request(app).get('/api/px/nodes/pve1/qemu/100/vnc-url').expect(200).then(function (res) {
+      expect(res.body.vncUrl).toBe(
+        'https://pve.local:8006/?console=kvm&novnc=1&node=pve1&vmid=100'
+      );
+    });
+  });
+
+  test('builds an lxc console URL for a container', function () {
+    writePXConfig({ px_url: 'https://pve.local:8006' });
+    var app = buildApp();
+    return request(app).get('/api/px/nodes/pve1/lxc/101/vnc-url').expect(200).then(function (res) {
+      expect(res.body.vncUrl).toContain('console=lxc');
+    });
+  });
+});

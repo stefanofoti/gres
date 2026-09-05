@@ -120,6 +120,33 @@ describe('GET /api/ha/devices', function () {
   });
 });
 
+describe('GET /api/ha/entity/:entity_id', function () {
+  test('400 when not configured', function () {
+    var app = buildApp();
+    return request(app).get('/api/ha/entity/light.kitchen').expect(400);
+  });
+
+  test('returns the entity state fetched from HA', function () {
+    writeHAConfig('http://ha.local:8123', 'tok');
+    mockFetchOnce(jsonRes({ entity_id: 'light.kitchen', state: 'on' }));
+    var app = buildApp();
+    return request(app).get('/api/ha/entity/light.kitchen').expect(200).then(function (res) {
+      expect(res.body).toEqual({ entity_id: 'light.kitchen', state: 'on' });
+      var call = fetch.mock.calls[0];
+      expect(call[0]).toBe('http://ha.local:8123/api/states/light.kitchen');
+    });
+  });
+
+  test('500 on upstream failure', function () {
+    writeHAConfig('http://ha.local:8123', 'tok');
+    fetch.mockImplementationOnce(function () { return Promise.reject(new Error('boom')); });
+    var app = buildApp();
+    return request(app).get('/api/ha/entity/light.kitchen').expect(500).then(function (res) {
+      expect(res.body.error).toBe('boom');
+    });
+  });
+});
+
 describe('POST /api/ha/service', function () {
   test('400 when not configured', function () {
     var app = buildApp();

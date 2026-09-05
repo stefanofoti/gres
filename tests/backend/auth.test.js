@@ -162,4 +162,38 @@ describe('GET/POST /api/auth', function () {
         expect(res.status).toBe(200);
       });
   });
+
+  test('expired attempts records are swept, not retained forever', function () {
+    process.env.SETTINGS_PIN = '4321';
+    var app = buildApp();
+    app.set('trust proxy', true);
+    var authModule = require(AUTH_ROUTE);
+
+    var nowSpy = jest.spyOn(Date, 'now');
+    var t0 = 1700000000000;
+    nowSpy.mockReturnValue(t0);
+
+    function failFrom(ip) {
+      return request(app)
+        .post('/api/auth/verify-pin')
+        .set('X-Forwarded-For', ip)
+        .send({ scope: 'settings', pin: '0000' });
+    }
+
+    return failFrom('1.1.1.1')
+      .then(function () {
+        expect(authModule._attempts).toHaveProperty(['1.1.1.1|settings']);
+
+        /* Past the 5-minute lockout window: the old IP's record is now
+           stale, but nothing has looked it up again to trigger the old
+           per-key eviction — only a sweep would catch it. */
+        nowSpy.mockReturnValue(t0 + 6 * 60 * 1000);
+        return failFrom('2.2.2.2');
+      })
+      .then(function () {
+        expect(authModule._attempts).not.toHaveProperty(['1.1.1.1|settings']);
+        expect(authModule._attempts).toHaveProperty(['2.2.2.2|settings']);
+        nowSpy.mockRestore();
+      });
+  });
 });

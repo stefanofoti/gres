@@ -42,7 +42,7 @@ npm run test:visual:capture  # re-record tests/visual/fixtures from a live backe
 
 ## Architecture
 
-**Backend** (`backend/`) — Express. `server.js` serves `frontend/` statically and mounts one router per integration under `/api/*` (`ha`, `jf`, `px`, `weather`, `markets`, `settings`, `config`, `auth`). Routers are thin credential-holding proxies to Home Assistant / Jellyfin / Proxmox / Open-Meteo / Yahoo Finance, so the browser never holds tokens. Persistence is a single JSON file (`data/settings.json`, gitignored) — no database despite `mongoose` being in `package.json`.
+**Backend** (`backend/`) — Express. `server.js` serves `frontend/` statically and mounts one router per integration under `/api/*` (`ha`, `jf`, `px`, `weather`, `markets`, `settings`, `config`, `auth`). Routers are thin credential-holding proxies to Home Assistant / Jellyfin / Proxmox / Open-Meteo / Yahoo Finance, so the browser never holds tokens. Persistence is a single JSON file (`data/settings.json`, gitignored) — no database.
 
 **Frontend** (`frontend/`) — **no build step.** Four hand-authored files: `index.html`, `css/main.css`, `js/widgets.js`, `js/app.js`.
 
