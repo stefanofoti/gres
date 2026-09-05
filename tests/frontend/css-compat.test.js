@@ -86,4 +86,52 @@ describe('the Home widget grid keeps its width/margin coupling', function () {
       expect(parseFloat(gutter[1])).toBeCloseTo(margin * 2, 5);
     }
   });
+
+  test('.jelly-card width subtracts exactly 2x the card margin', function () {
+    var marginMatch = CSS.match(/\.jelly-card\s*\{[^}]*?margin:\s*([\d.]+)rem/);
+    expect(marginMatch).not.toBeNull();
+
+    var margin = parseFloat(marginMatch[1]);
+    var widths = CSS.match(/\.jelly-card[^{]*\{[^}]*?width:\s*calc\([^)]*\)/g) || [];
+    expect(widths.length).toBeGreaterThan(0);
+
+    for (var i = 0; i < widths.length; i++) {
+      var gutter = widths[i].match(/-\s*([\d.]+)rem\s*\)/);
+      expect(gutter).not.toBeNull();
+      expect(parseFloat(gutter[1])).toBeCloseTo(margin * 2, 5);
+    }
+  });
+});
+
+describe('single-margin wrapping rows keep their half-margin width coupling', function () {
+  /* .wx-day and .mk-info-item only put margin-right on the non-last column
+     in a row (nth-child resets it on the last), so — unlike .w-card, where
+     every card carries the full margin — the width must subtract half of
+     it, not the whole thing. .wx-day fell out of sync with this exact
+     relationship before (0.25rem subtracted instead of 0.125rem). */
+  function tokenRem(name) {
+    var m = CSS.match(new RegExp('--' + name + ':\\s*([\\d.]+)rem'));
+    expect(m).not.toBeNull();
+    return parseFloat(m[1]);
+  }
+
+  test('.wx-day two-column width is half of --space-2xs less than 50%', function () {
+    var margin = tokenRem('space-2xs');
+    var widths = CSS.match(/\.wx-day\s*\{[^}]*?width:\s*calc\([^)]*\)/g) || [];
+    expect(widths.length).toBeGreaterThan(0);
+
+    var gutter = widths[0].match(/-\s*([\d.]+)rem\s*\)/);
+    expect(gutter).not.toBeNull();
+    expect(parseFloat(gutter[1])).toBeCloseTo(margin / 2, 5);
+  });
+
+  test('.mk-info-item two-up width is half of --space-lg less than 50%', function () {
+    var margin = tokenRem('space-lg');
+    var widths = CSS.match(/\.mk-info-item\s*\{[^}]*?width:\s*calc\(50%[^)]*\)/g) || [];
+    expect(widths.length).toBeGreaterThan(0);
+
+    var gutter = widths[0].match(/-\s*([\d.]+)rem\s*\)/);
+    expect(gutter).not.toBeNull();
+    expect(parseFloat(gutter[1])).toBeCloseTo(margin / 2, 5);
+  });
 });
