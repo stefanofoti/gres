@@ -386,6 +386,9 @@ if (pinReady) {
     // Load page-specific data if needed
     if (id === 'smarthome') loadSmartHome(false);
     if (id === 'settings')  { loadSettings(); loadAdminSettings(); }
+    /* Leaving Server stops its background status poller — it has no other
+       page-visibility guard, unlike the Home widget scheduler. */
+    if (id !== 'server' && window._pxStopPolling) window._pxStopPolling();
   }
 
   /* Settings tab gate — uses the 'settings' scope, cached for the page
@@ -415,7 +418,7 @@ if (pinReady) {
 
   /* ── HA status ──────────────────────────────────────── */
   function checkHA() {
-    xhr('GET', API + '/api/ha/status', null, function (err, data) {
+    window._xhr('GET', API + '/api/ha/status', null, function (err, data) {
       var ok = !err && data && data.connected;
       $('status-dot').className = 'dot ' + (ok ? 'dot-ok' : 'dot-err');
       $('status-text').textContent = ok ? 'HA Online' : 'HA offline';
@@ -816,7 +819,7 @@ if (pinReady) {
 
   /* ── HA service call ────────────────────────────────── */
   function callService(domain, service, serviceData, cb) {
-    xhr('POST', API + '/api/ha/service', {
+    window._xhr('POST', API + '/api/ha/service', {
       domain: domain, service: service, service_data: serviceData
     }, function(err, data) { cb(err, data); });
   }
@@ -903,7 +906,7 @@ if (pinReady) {
       hide($('smarthome-content'));
     }
 
-    xhr('GET', API + '/api/ha/devices', null, function (err, data) {
+    window._xhr('GET', API + '/api/ha/devices', null, function (err, data) {
       _haRefreshBusy = false;
       hide($('smarthome-loading'));
 
@@ -1050,6 +1053,11 @@ if (pinReady) {
      and so a poll-driven sync never rewrites it in a different format
      than the initial build used. */
   window._haStateText = buildStateText;
+  /* Same reasoning for the icon map and name formatter: this module owns
+     the canonical copy, other modules read it instead of keeping their
+     own (which is how the icon map and friendlyName drifted apart before). */
+  window._haIcons = ICONS;
+  window._haFriendlyName = friendlyName;
 
   function applyCardColor(card, entity) {
     var attr = entity.attributes || {};
@@ -1496,6 +1504,16 @@ if (pinReady) {
              never recreates the card or reflows the grid. */
           job.def.render(job.ctx);
         } catch (e) {
+          /* Same treatment as the initial render's catch below — a broken
+             refresh must not leave the card blank until the next cycle.
+             IIFE-bind job: it's a loop-scoped var, and the retry callback
+             below can fire long after this loop has moved on to (or past)
+             other jobs. */
+          (function (failedJob) {
+            failedJob.ctx.card.setError('Widget failed to load', function () {
+              failedJob.def.render(failedJob.ctx);
+            });
+          })(job);
           if (window.console && window.console.error) window.console.error(e);
         }
       }
@@ -3238,6 +3256,7 @@ if (pinReady) {
 
   /* ── SELECT NODE ────────────────────────────────────── */
   function selectNode(nodeName, nodeData) {
+    clearInterval(px.pollTimer);
     px.selected = { kind: 'node', node: nodeName };
     var detail = $p('px-detail-content');
     $p('px-detail-empty').classList.add('hidden');
@@ -3347,6 +3366,7 @@ if (pinReady) {
 
   /* ── SELECT VM ──────────────────────────────────────── */
   function selectVM(nodeName, vmid, vmType, vmData) {
+    clearInterval(px.pollTimer);
     px.selected = { kind: 'vm', node: nodeName, vmid: vmid, type: vmType };
     var detail = $p('px-detail-content');
     $p('px-detail-empty').classList.add('hidden');
@@ -3795,6 +3815,11 @@ if (pinReady) {
     window._markCredential($p('px-token'), pxTokenSet);
   });
 
+  /* Stops the node/VM status poller. Called from the tab-switch handler
+     when navigating away from Server, so leaving the tab doesn't leave a
+     background poll running indefinitely. */
+  window._pxStopPolling = function () { clearInterval(px.pollTimer); };
+
 })();
 
 /* ════════════════════════════════════════════════════════
@@ -3984,11 +4009,9 @@ if (pinReady) {
       ];
 
       function domainOf(eid) { return eid.split('.')[0]; }
-      function friendlyName(e) {
-        return (e.attributes && e.attributes.friendly_name)
-          ? e.attributes.friendly_name
-          : e.entity_id.split('.')[1].replace(/_/g,' ');
-      }
+      /* The top module owns the canonical friendlyName — it always runs
+         first, so window._haFriendlyName is set by the time this fires. */
+      var friendlyName = window._haFriendlyName;
 
       var hasAny = false;
       for (var g = 0; g < HA_GROUPS.length; g++) {
@@ -4206,14 +4229,11 @@ if (pinReady) {
 
   function $d(id) { return document.getElementById(id); }
 
-  var ICONS = { light: '○', switch: '⌁', input_boolean: '⌁', media_player: '▷', climate: '◇', fan: '◎', cover: '▭' };
-
+  /* The top module owns the canonical icon map and friendlyName — it
+     always runs first, so both globals are set by the time this fires. */
+  var ICONS = window._haIcons;
   function domainOf(eid)   { return eid.split('.')[0]; }
-  function friendlyName(e) {
-    return (e.attributes && e.attributes.friendly_name)
-      ? e.attributes.friendly_name
-      : e.entity_id.split('.')[1].replace(/_/g, ' ');
-  }
+  var friendlyName = window._haFriendlyName;
 
   /* Locked entity ids — kept in sync with the main module's copy via
      window._setDeviceLocked, and persisted under 'ha_protected_entities'. */

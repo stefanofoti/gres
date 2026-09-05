@@ -347,6 +347,50 @@ describe('settings load', function () {
   });
 });
 
+describe('FEATURES module: window._xhr gate applies to background HA polling', function () {
+  /*
+   * checkHA() used to call the top module's local `xhr` closure instead of
+   * window._xhr, so disabling "Smart Home" in Settings never stopped its
+   * 30s background poll of /api/ha/status — the one thing the FEATURES
+   * module's window._xhr wrapper (installed after boot) is supposed to
+   * block. This asserts the poll actually stops once the wrapper is live
+   * and the feature is off, and keeps running when it's on.
+   */
+  function countHAStatusCalls(featuresDisabled) {
+    var calls = 0;
+    loadApp(function (method, url, body) {
+      if (method === 'GET' && url.indexOf('/api/ha/status') !== -1) {
+        calls++;
+        return { status: 200, body: { connected: true } };
+      }
+      if (method === 'GET' && url.indexOf('/api/settings') !== -1 && url.indexOf('/admin') === -1) {
+        return { status: 200, body: { features_disabled: featuresDisabled } };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url, body);
+    });
+
+    return flush().then(function () {
+      /* Settings have now loaded and the FEATURES wrapper is installed;
+         only calls from here on exercise the gate. */
+      calls = 0;
+      jest.advanceTimersByTime(30000);
+      return flush();
+    }).then(function () { return calls; });
+  }
+
+  test('disabling Smart Home stops the HA status poll', function () {
+    return countHAStatusCalls(['smarthome']).then(function (calls) {
+      expect(calls).toBe(0);
+    });
+  });
+
+  test('an enabled Smart Home keeps polling', function () {
+    return countHAStatusCalls([]).then(function (calls) {
+      expect(calls).toBeGreaterThan(0);
+    });
+  });
+});
+
 describe('server-scope guard on Proxmox power actions', function () {
   /*
    * The backend gates node power and VM lifecycle on the 'server' scope. The

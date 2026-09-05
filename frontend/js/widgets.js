@@ -258,7 +258,7 @@
   var HA_STATES = {
     on: 'On', off: 'Off', open: 'Open', closed: 'Closed',
     playing: 'Playing', paused: 'Paused', idle: 'Idle',
-    unavailable: 'N/A', unknown: '?'
+    unavailable: 'N/A', unknown: '?', standby: 'Standby'
   };
 
   function domainOf(eid)   { return eid.split('.')[0]; }
@@ -270,6 +270,14 @@
      changes format on the first refresh. */
   function stateText(entity) {
     return window._haStateText ? window._haStateText(entity) : stateLabel(entity.state);
+  }
+
+  /* app.js also owns the canonical icon map, for the same reason — same
+     fallback shape as stateText, needed because this file loads and can
+     run before app.js's globals are set. */
+  function iconFor(domain) {
+    var icons = window._haIcons || HA_ICONS;
+    return icons[domain] || '◈';
   }
 
   /** "3 of 8 on", counting only entities HA actually reported. */
@@ -295,10 +303,13 @@
     var status = card.querySelector('.w-status');
     if (status) status.textContent = haSummaryText(haWidgets, entities || []);
   }
-  function friendlyName(e) {
+  function friendlyNameFallback(e) {
     return (e.attributes && e.attributes.friendly_name)
       ? e.attributes.friendly_name
       : e.entity_id.split('.')[1].replace(/_/g, ' ');
+  }
+  function friendlyName(e) {
+    return window._haFriendlyName ? window._haFriendlyName(e) : friendlyNameFallback(e);
   }
 
   function buildHACards(grid, haWidgets, entities) {
@@ -330,7 +341,7 @@
         var card = el('div', 'device-card' + (on ? ' on' : '') + (unavail ? ' unavail' : ''));
         card.setAttribute('data-eid', entity.entity_id);
 
-        var ico  = el('div', 'card-icon', HA_ICONS[domain] || '◈');
+        var ico  = el('div', 'card-icon', iconFor(domain));
         var info = el('div', 'card-info');
         info.appendChild(el('div', 'card-name', friendlyName(entity)));
         var stateEl = el('div', 'card-state', stateText(entity));
