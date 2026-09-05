@@ -34,12 +34,9 @@ var express = require('express');
 var router  = express.Router();
 var https   = require('https');
 var http    = require('http');
-var fs      = require('fs');
-var path    = require('path');
 var url     = require('url');
 var session = require('../middleware/session');
-
-var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
+var store   = require('../lib/settingsStore');
 
 /**
  * HTTPS agent that ignores self-signed certificate errors.
@@ -56,16 +53,12 @@ var agentHttps = new https.Agent({ rejectUnauthorized: false });
  * @returns {{ url: string, token: string, tokenId: string }}
  */
 function getPXConfig() {
-  try {
-    var s = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return {
-      url:     (s.px_url     || '').replace(/\/$/, ''),
-      token:    s.px_token   || '',   /* API token secret (UUID) */
-      tokenId:  s.px_tokenid || ''    /* API token ID: user@realm!name */
-    };
-  } catch (e) {
-    return { url: '', token: '', tokenId: '' };
-  }
+  var s = store.readSettings();
+  return {
+    url:     (s.px_url     || '').replace(/\/$/, ''),
+    token:    s.px_token   || '',   /* API token secret (UUID) */
+    tokenId:  s.px_tokenid || ''    /* API token ID: user@realm!name */
+  };
 }
 
 /**

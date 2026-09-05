@@ -20,10 +20,7 @@
 var express = require('express');
 var router  = express.Router();
 var fetch   = require('node-fetch');
-var fs      = require('fs');
-var path    = require('path');
-
-var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
+var store   = require('../lib/settingsStore');
 
 /* ── Config helpers ─────────────────────────────────────── */
 
@@ -33,15 +30,11 @@ var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
  * @returns {{ url: string, token: string }}
  */
 function getJFConfig() {
-  try {
-    var s = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return {
-      url:   (s.jf_url   || '').replace(/\/$/, ''),
-      token:  s.jf_token || ''
-    };
-  } catch (e) {
-    return { url: '', token: '' };
-  }
+  var s = store.readSettings();
+  return {
+    url:   (s.jf_url   || '').replace(/\/$/, ''),
+    token:  s.jf_token || ''
+  };
 }
 
 /**

@@ -101,6 +101,38 @@ describe('GET/POST/DELETE /api/settings', function () {
       });
   });
 
+  test('POST / silently drops keys outside the known schema', function () {
+    var app = buildApp();
+    return request(app)
+      .post('/api/settings')
+      .send({ features_disabled: ['markets'], not_a_real_key: 'nope' })
+      .expect(200)
+      .then(function (res) {
+        expect(res.body.settings).not.toHaveProperty('not_a_real_key');
+        return request(app).get('/api/settings/admin').expect(200);
+      })
+      .then(function (res) {
+        expect(res.body).not.toHaveProperty('not_a_real_key');
+      });
+  });
+
+  test('POST / ignores a __proto__ key rather than merging it in', function () {
+    var app = buildApp();
+    return request(app)
+      .post('/api/settings')
+      .send(JSON.parse('{"features_disabled":["markets"],"__proto__":{"polluted":true}}'))
+      .expect(200)
+      .then(function () {
+        /* Neither the response object nor a fresh plain object should have
+           picked up the polluted key from Object.prototype. */
+        expect({}).not.toHaveProperty('polluted');
+        return request(app).get('/api/settings').expect(200);
+      })
+      .then(function (res) {
+        expect(res.body).not.toHaveProperty('polluted');
+      });
+  });
+
   test('the admin read reports an unset credential as false', function () {
     var app = buildApp();
     return request(app).get('/api/settings/admin').expect(200).then(function (res) {

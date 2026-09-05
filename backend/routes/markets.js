@@ -2,34 +2,14 @@
 
 var express = require('express');
 var router  = express.Router();
-var fs      = require('fs');
-var path    = require('path');
+var store   = require('../lib/settingsStore');
 var YahooFinance = require('yahoo-finance2').default;
 var yf           = new YahooFinance({ suppressNotices: ['yahooSurvey'] });
 
-
-var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
-
 /* ── Helpers ──────────────────────────────────────────── */
 
-function ensureDataDir() {
-  var dir = path.dirname(DATA_FILE);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify({}));
-}
-
-function readSettings() {
-  ensureDataDir();
-  try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
-  catch (e) { return {}; }
-}
-
-function writeSettings(data) {
-  ensureDataDir();
-  var tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
-  fs.renameSync(tmp, DATA_FILE);
-}
+var readSettings  = store.readSettings;
+var writeSettings = store.writeSettings;
 
 function getFavorites() {
   var s = readSettings();

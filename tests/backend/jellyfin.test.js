@@ -210,3 +210,82 @@ describe('GET /api/jf/home-summary', function () {
     });
   });
 });
+
+describe('GET /api/jf/play/start', function () {
+  test('400 when Jellyfin is not configured', function () {
+    var app = buildApp();
+    return request(app).get('/api/jf/play/start?userId=u1&itemId=i1').expect(400);
+  });
+
+  test('400 when userId or itemId is missing', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    var app = buildApp();
+    return request(app).get('/api/jf/play/start?userId=u1').expect(400);
+  });
+
+  test('resolves a proxied master.m3u8 URL from the playback info', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    mockFetchOnce({ MediaSources: [{ Id: 'src1' }] });
+    var app = buildApp();
+    return request(app).get('/api/jf/play/start?userId=u1&itemId=i1').expect(200).then(function (res) {
+      expect(res.body.url).toMatch(/^\/api\/jf\/play\/stream\?u=/);
+      var upstream = decodeURIComponent(res.body.url.split('u=')[1]);
+      expect(upstream).toMatch(/^\/Videos\/i1\/master\.m3u8\?/);
+      expect(upstream).toContain('MediaSourceId=src1');
+    });
+  });
+
+  test('500 when the upstream playback-info call fails', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    mockFetchOnce({}, false);
+    var app = buildApp();
+    return request(app).get('/api/jf/play/start?userId=u1&itemId=i1').expect(500);
+  });
+});
+
+describe('GET /api/jf/play/stream', function () {
+  function mockUpstreamResponse(resolution) {
+    fetch.mockImplementationOnce(function () { return Promise.resolve(resolution); });
+  }
+
+  test('400 when Jellyfin is not configured', function () {
+    var app = buildApp();
+    return request(app).get('/api/jf/play/stream?u=%2FVideos%2Fi1%2Fmaster.m3u8').expect(400);
+  });
+
+  test('400 when the u query param is missing', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    var app = buildApp();
+    return request(app).get('/api/jf/play/stream').expect(400);
+  });
+
+  test('rewrites playlist entries to point back through the proxy', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    mockUpstreamResponse({
+      ok: true,
+      status: 200,
+      headers: { get: function () { return 'application/vnd.apple.mpegurl'; } },
+      text: function () {
+        return Promise.resolve('#EXTM3U\nsegment1.ts\n');
+      }
+    });
+    var app = buildApp();
+    return request(app)
+      .get('/api/jf/play/stream?u=' + encodeURIComponent('/Videos/i1/master.m3u8'))
+      .expect(200)
+      .then(function (res) {
+        expect(res.text).toContain('#EXTM3U');
+        expect(res.text).toContain('/api/jf/play/stream?u=');
+        expect(res.text).toContain(encodeURIComponent('/Videos/i1/segment1.ts'));
+      });
+  });
+
+  test('502 on upstream failure', function () {
+    writeJFConfig('http://jf.local:8096', 'tok');
+    mockUpstreamResponse({ ok: false, status: 404, headers: { get: function () { return ''; } } });
+    var app = buildApp();
+    return request(app)
+      .get('/api/jf/play/stream?u=' + encodeURIComponent('/Videos/i1/master.m3u8'))
+      .expect(502);
+  });
+});

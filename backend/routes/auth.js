@@ -97,6 +97,24 @@ function clientIp(req) {
 }
 
 /**
+ * Drop every attempts entry whose lockout window has already expired.
+ * Without this, an entry only ever gets deleted when its own key is
+ * looked up again — a distinct IP that never comes back leaves its record
+ * behind forever. Called from isLockedOut, which runs on every PIN
+ * attempt, so the map never grows past attackers active in the current
+ * window.
+ */
+function sweepExpiredAttempts() {
+  var now = Date.now();
+  for (var key in attempts) {
+    if (Object.prototype.hasOwnProperty.call(attempts, key) &&
+        now - attempts[key].firstAt > LOCKOUT_MS) {
+      delete attempts[key];
+    }
+  }
+}
+
+/**
  * True when the given IP+scope has exceeded MAX_ATTEMPTS within the
  * lockout window.
  *
@@ -104,12 +122,9 @@ function clientIp(req) {
  * @returns {boolean}
  */
 function isLockedOut(key) {
+  sweepExpiredAttempts();
   var rec = attempts[key];
   if (!rec) return false;
-  if (Date.now() - rec.firstAt > LOCKOUT_MS) {
-    delete attempts[key];
-    return false;
-  }
   return rec.count >= MAX_ATTEMPTS;
 }
 
@@ -192,3 +207,6 @@ router.post('/verify-pin', function (req, res) {
 });
 
 module.exports = router;
+/* Test-only introspection of the rate-limit map — mirrors how settings.js
+   exports its key lists alongside the router. */
+module.exports._attempts = attempts;

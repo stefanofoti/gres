@@ -22,11 +22,9 @@
 var express = require('express');
 var router  = express.Router();
 var fetch   = require('node-fetch');
-var fs      = require('fs');
-var path    = require('path');
 var session = require('../middleware/session');
+var store   = require('../lib/settingsStore');
 
-var DATA_FILE = path.join(process.cwd(), 'data/settings.json');
 /**
  * Domains exposed to the frontend Smart-Home tab.
  * Adding a domain here makes it visible without touching the frontend.
@@ -45,12 +43,8 @@ var RELEVANT_DOMAINS = [
  * @returns {{ url: string, token: string }}
  */
 function getHAConfig() {
-  try {
-    var s = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return { url: s.ha_url || '', token: s.ha_token || '' };
-  } catch (e) {
-    return { url: '', token: '' };
-  }
+  var s = store.readSettings();
+  return { url: s.ha_url || '', token: s.ha_token || '' };
 }
 
 /**
@@ -143,12 +137,8 @@ function fetchRelevantEntities(config, domain) {
  * @returns {Array<string>} entity ids flagged as protected.
  */
 function getProtectedEntities() {
-  try {
-    var s = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return Array.isArray(s.ha_protected_entities) ? s.ha_protected_entities : [];
-  } catch (e) {
-    return [];
-  }
+  var s = store.readSettings();
+  return Array.isArray(s.ha_protected_entities) ? s.ha_protected_entities : [];
 }
 
 /**
