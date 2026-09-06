@@ -155,23 +155,22 @@
   /* Esposto globalmente per il riuso tra moduli */
   window._toast = toast;
 
-  /* ── clock ──────────────────────────────────────────── */
+  /* ── clock + greeting ──────────────────────────────────
+     Both are re-derived from `new Date()` on every tick (rather than
+     computed once at load) so they stay correct across an hour/day
+     boundary and the moment the app wakes from standby — see the
+     visibilitychange handler below. */
   function tick() {
     var n = new Date(), h = n.getHours(), m = n.getMinutes();
     $('clock').textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-  }
-  tick();
-  setInterval(tick, 15000);
-
-  /* ── greeting ───────────────────────────────────────── */
-  (function () {
-    var h = new Date().getHours();
     $('home-greeting').textContent =
       h < 6  ? 'Good night'     :
       h < 12 ? 'Good morning'   :
       h < 17 ? 'Good afternoon' :
       h < 21 ? 'Good evening'   : 'Good night';
-  })();
+  }
+  tick();
+  setInterval(tick, 15000);
 
   /* ── Generic PIN prompt ─────────────────────────────────
      A single overlay reused for two purposes:
@@ -415,6 +414,48 @@ if (pinReady) {
 
   /* expose showPage for other modules that need programmatic navigation */
   window._showPage = showPage;
+
+  /* ── wake-from-standby refresh ─────────────────────────
+     This runs on a wall panel whose iPad screen locks and unlocks all
+     day. Locking pauses JS entirely, so on unlock everything on screen
+     is stale until whatever poll interval happens to fire next. Rather
+     than wait, force an immediate refresh of the clock/greeting and of
+     whichever tab is currently visible the moment the page becomes
+     visible again. Each per-tab loader here is the exact function its
+     own tab-click handler already calls, so this is just re-running
+     "as if the user just tapped this tab" rather than new behaviour.
+     Settings is deliberately excluded: reloading it can blank a
+     credential field the user is mid-edit on (see _markCredential). */
+  var WAKE_MIN_GAP_MS = 2000;
+  var _lastWakeAt = 0;
+
+  function onAppWake() {
+    var now = Date.now();
+    if (now - _lastWakeAt < WAKE_MIN_GAP_MS) return;
+    _lastWakeAt = now;
+
+    tick();
+
+    var cp = window._currentPage;
+    if (cp === 'home'      && window._homeRefresh)      window._homeRefresh();
+    if (cp === 'meteo'     && window._weatherRefresh)    window._weatherRefresh();
+    if (cp === 'markets'   && window._marketsRefresh)    window._marketsRefresh();
+    if (cp === 'jelly'     && window._jellyRefresh)      window._jellyRefresh();
+    if (cp === 'smarthome') loadSmartHome(false);
+    if (cp === 'server'    && window._serverWakeRefresh) window._serverWakeRefresh();
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) onAppWake();
+  }, false);
+
+  /* Fallback for the rarer case where iOS purges the page from memory
+     during a long lock and restores it from the back/forward cache
+     instead of just unpausing it — visibilitychange alone would miss
+     that. The 2s debounce above absorbs the case where both fire. */
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) onAppWake();
+  }, false);
 
   /* ── HA status ──────────────────────────────────────── */
   function checkHA() {
@@ -1391,14 +1432,18 @@ if (pinReady) {
 
   function $(id) { return document.getElementById(id); }
 
-  /* populate home-date */
-  (function () {
+  /* home-date: re-derived from `new Date()` every time it's called
+     rather than once at load, so it rolls over correctly across
+     midnight and on wake from standby (see call sites below and the
+     scheduler tick further down). */
+  function updateHomeDate() {
     var d = new Date();
     var days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var el = $('home-date');
     if (el) el.textContent = days[d.getDay()] + ', ' + months[d.getMonth()] + ' ' + d.getDate();
-  })();
+  }
+  updateHomeDate();
 
   /* mirror HA status dot on home screen */
   (function () {
@@ -1492,6 +1537,10 @@ if (pinReady) {
   function startScheduler() {
     if (_schedTimer) return;
     _schedTimer = setInterval(function () {
+      /* Cheap DOM write, not a fetch — runs even when Home isn't the
+         visible tab so the date is never more than a tick stale, e.g.
+         if the panel is simply left open on Home across midnight. */
+      updateHomeDate();
       if (window._currentPage && window._currentPage !== 'home') return;
 
       var now = Date.now();
@@ -1524,6 +1573,7 @@ if (pinReady) {
      Rebuilds the whole grid. Cheap enough (a handful of cards) and it
      keeps saved order authoritative without diffing. */
   function renderHome() {
+    updateHomeDate();
     _grid    = $('home-widgets');
     _emptyEl = $('home-empty');
     if (!_grid) return;
@@ -1892,6 +1942,9 @@ if (pinReady) {
       loadFavorites();
     }, true);
   }
+
+  /* used by the core module's wake-from-standby handler */
+  window._marketsRefresh = loadFavorites;
 })();
 
 /* ════════════════════════════════════════════════════════
@@ -2652,6 +2705,9 @@ if (pinReady) {
     setTimeout(function () { loadWeatherPage(); }, 60);
   }, true);
 
+  /* used by the core module's wake-from-standby handler */
+  window._weatherRefresh = loadWeatherPage;
+
   /* Weather registers itself with the central settings loader */
   window._onSettingsLoad(function (data) {
     wx.defaultLocation = data.weather_default_location || null;
@@ -3007,6 +3063,13 @@ if (pinReady) {
       }
     }, true); // capture phase — fires before the page switch handler
   }
+
+  /* used by the core module's wake-from-standby handler — skip if the
+     tab was never visited yet, so waking up doesn't force a first load
+     of a tab the user hasn't opened. */
+  window._jellyRefresh = function () {
+    if (jf.userId) loadJelly(false);
+  };
 
   /* ── settings: Jellyfin save & test ────────────────── */
   /* Whether an API key is already stored. The value itself never arrives. */
@@ -3843,6 +3906,17 @@ if (pinReady) {
      when navigating away from Server, so leaving the tab doesn't leave a
      background poll running indefinitely. */
   window._pxStopPolling = function () { clearInterval(px.pollTimer); };
+
+  /* Used by the core module's wake-from-standby handler. _pxStopPolling
+     kills the node/VM poll the moment you leave this tab (see above), so
+     unlike the other tabs there's no live timer to just resume on wake —
+     re-opening whatever was selected is what restarts it. Storage rows
+     have no poll, so they're left alone. */
+  window._serverWakeRefresh = function () {
+    if (!px.selected) return;
+    if (px.selected.kind === 'node') selectNode(px.selected.node);
+    if (px.selected.kind === 'vm')   selectVM(px.selected.node, px.selected.vmid, px.selected.type);
+  };
 
 })();
 
