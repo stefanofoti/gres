@@ -2681,6 +2681,7 @@ if (pinReady) {
   /* ── state ─────────────────────────────────────────── */
   var jf = {
     userId:   null,
+    type:     'Movie',
     page:     0,
     total:    0,
     loading:  false,
@@ -2731,7 +2732,7 @@ if (pinReady) {
         return;
       }
 
-      var type     = $j('jf-type').value;
+      var type     = jf.type;
       var sortBy   = $j('jf-sort').value;
       var pageSize = parseInt($j('jf-pagesize').value, 10);
       var search   = ($j('jf-search').value || '').trim();
@@ -2772,12 +2773,17 @@ if (pinReady) {
     $j('jelly-subtitle').textContent = total + ' ' + label;
   }
 
-  /* mirrors the .jelly-card column-count breakpoints in css/main.css */
+  /* mirrors the .jelly-card column-count breakpoints in css/main.css —
+     keep both in sync or poster images get requested at the wrong size */
   function jellyColumns() {
     var w = window.innerWidth;
-    if (w >= 900) return 8;
-    if (w >= 600) return 6;
-    return 5;
+    if (w >= 1400) return 9;
+    if (w >= 1200) return 8;
+    if (w >= 1024) return 7;
+    if (w >= 768)  return 6;
+    if (w >= 600)  return 5;
+    if (w >= 480)  return 4;
+    return 3;
   }
 
   /* ── render grid ────────────────────────────────────── */
@@ -2827,6 +2833,13 @@ if (pinReady) {
       posterWrap.appendChild(ph);
     }
 
+    if (item.CommunityRating) {
+      var badge = document.createElement('div');
+      badge.className = 'jelly-card-rating';
+      badge.textContent = '★ ' + item.CommunityRating.toFixed(1);
+      posterWrap.appendChild(badge);
+    }
+
     /* info */
     var info  = document.createElement('div');
     info.className = 'jelly-card-info';
@@ -2874,7 +2887,18 @@ if (pinReady) {
   /* ── filter/search change ───────────────────────────── */
   function onFilterChange() { loadJelly(true); }
 
-  $j('jf-type').addEventListener('change', onFilterChange);
+  var jfTypeBtns = document.querySelectorAll('#jf-type-seg .jf-seg-btn');
+  for (var jfti = 0; jfti < jfTypeBtns.length; jfti++) {
+    jfTypeBtns[jfti].addEventListener('click', function () {
+      if (this.className.indexOf('is-active') !== -1) return;
+      for (var k = 0; k < jfTypeBtns.length; k++) {
+        jfTypeBtns[k].className = 'jf-seg-btn';
+      }
+      this.className = 'jf-seg-btn is-active';
+      jf.type = this.getAttribute('data-type');
+      onFilterChange();
+    });
+  }
   $j('jf-sort').addEventListener('change', onFilterChange);
   $j('jf-pagesize').addEventListener('change', onFilterChange);
 
