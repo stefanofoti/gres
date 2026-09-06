@@ -522,13 +522,13 @@
         </div>
         <!-- Filters bar -->
         <div class="jelly-filters">
-          <select id="jf-type" class="jf-select">
-            <option value="Movie">Movies</option>
-            <option value="Series">TV Series</option>
-          </select>
+          <div class="jf-seg" id="jf-type-seg">
+            <button type="button" class="jf-seg-btn is-active" data-type="Movie">Movies</button>
+            <button type="button" class="jf-seg-btn" data-type="Series">TV Series</button>
+          </div>
           <select id="jf-sort" class="jf-select">
+            <option value="DateCreated" selected>Recent</option>
             <option value="SortName">A → Z</option>
-            <option value="DateCreated">Recent</option>
             <option value="CommunityRating">Rating</option>
             <option value="ProductionYear">Year</option>
           </select>
@@ -546,9 +546,21 @@
       </div>
 
       <div class="page-content">
-        <div id="jelly-loading" class="loading-state">
-          <div class="spinner"></div>
-          <div>Loading library…</div>
+        <div id="jelly-loading" class="loading-state jelly-loading-state">
+          <div class="jelly-grid jelly-skel-grid">
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+            <div class="jelly-skel-card"><div class="jelly-card-poster"></div><div class="jelly-card-info"><div class="jelly-skel-line jelly-skel-line--title"></div><div class="jelly-skel-line jelly-skel-line--year"></div></div></div>
+          </div>
         </div>
         <div id="jelly-error" class="error-state hidden">
           <div class="error-icon">⚠</div>
