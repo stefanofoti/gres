@@ -12,3 +12,4 @@ data/
 *.zip
 test-results/
 playwright-report/
+*.prv

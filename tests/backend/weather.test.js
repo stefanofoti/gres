@@ -6,8 +6,7 @@ var fs = require('fs');
 var path = require('path');
 var wd = require('../helpers/tempWorkdir');
 
-jest.mock('node-fetch');
-var fetch; // reacquired fresh in beforeEach, after resetModules — see helpers/tempWorkdir.js
+var fetch; // reassigned fresh in beforeEach — see helpers/tempWorkdir.js
 
 var WEATHER_ROUTE = path.join(__dirname, '../../backend/routes/weather');
 
@@ -27,7 +26,7 @@ function mockFetchOnce(ok, jsonBody) {
 
 beforeEach(function () {
   wd.useTempWorkdir();
-  fetch = require('node-fetch');
+  fetch = global.fetch = jest.fn();
 });
 afterEach(function () { wd.restoreWorkdir(); });
 
