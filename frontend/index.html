@@ -369,6 +369,22 @@
             </div>
           </div>
 
+          <!-- Tap sound toggle -->
+          <div class="appearance-row">
+            <div class="appearance-row-left">
+              <div class="appearance-row-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 10v4h3.5L12 18V6L7.5 10H4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                  <path d="M16 9.5a3.5 3.5 0 0 1 0 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="appearance-row-label">Tap sound</div>
+            </div>
+            <div class="power-toggle" id="toggle-tap-sound">
+              <div class="power-knob"></div>
+            </div>
+          </div>
+
           <!-- Text size -->
           <div class="appearance-row">
             <div class="appearance-row-left">
@@ -819,6 +835,15 @@
         <button id="pin-submit" class="btn-primary">Unlock</button>
       </div>
     </div>
+  </div>
+
+  <!-- Shown only for the few seconds it takes the wake-from-standby
+       refresh to finish (see onAppWake in app.js) — masks the moment
+       right after the iPad unlocks where widgets/tabs are mid-refetch
+       and would otherwise briefly show stale or half-updated content.
+       Never shown for a normal page load or tab switch. -->
+  <div id="wake-overlay" class="wake-overlay hidden" aria-hidden="true">
+    <div class="spinner"></div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.4/chartist.min.js"></script>
