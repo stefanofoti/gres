@@ -156,7 +156,7 @@ app.use('/api', function (req, res) {
 /* ── SPA fallback ───────────────────────────────────────
    Any non-API path returns index.html so that the
    single-page app can handle client-side navigation.  */
-app.get('*', function (req, res) {
+app.get('/*splat', function (req, res) {
   res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
