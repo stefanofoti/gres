@@ -45,6 +45,26 @@
   window._xhr = xhr;
   /* openLightSheet exposed after function is defined below */
 
+  /* Counts requests currently in flight, so the wake-from-standby
+     overlay (below) can hide itself once whatever it triggered has
+     actually finished, instead of guessing a fixed delay. Wrapped
+     around the innermost xhr, underneath every other module's own
+     window._xhr interceptor (feature gate, markets-toggle hook, ...) —
+     every one of those is a proxy in front of this same function, so a
+     request one of them drops before calling through is correctly
+     never counted here. */
+  var _pendingXhrCount = 0;
+  (function () {
+    var raw = window._xhr;
+    window._xhr = function (method, url, body, cb) {
+      _pendingXhrCount++;
+      raw(method, url, body, function (err, data) {
+        _pendingXhrCount--;
+        cb(err, data);
+      });
+    };
+  })();
+
   /* ── shared weather icon function ───────────────────
      Returns an SVG string for a given WMO weather code.
      isDay: 1 = day, 0 = night.
@@ -425,14 +445,39 @@ if (pinReady) {
      own tab-click handler already calls, so this is just re-running
      "as if the user just tapped this tab" rather than new behaviour.
      Settings is deliberately excluded: reloading it can blank a
-     credential field the user is mid-edit on (see _markCredential). */
+     credential field the user is mid-edit on (see _markCredential).
+
+     Refreshing several tabs' worth of data over a connection that's
+     often still reassociating with wifi right after unlock can take a
+     visible moment, during which the page is mid-refetch and would
+     otherwise show a jumble of stale and freshly-updated content. The
+     #wake-overlay full-screen spinner masks exactly that window: shown
+     only here, hidden as soon as every request this triggered has
+     settled (via _pendingXhrCount), with a floor so it doesn't flash
+     for an instant refresh and a ceiling so a hung request can't leave
+     it stuck up. */
   var WAKE_MIN_GAP_MS = 2000;
+  var WAKE_OVERLAY_MIN_MS = 350;
+  var WAKE_OVERLAY_MAX_MS = 8000;
   var _lastWakeAt = 0;
+  var _wakeOverlayTimer = null;
+
+  function showWakeOverlay() {
+    var el = $('wake-overlay');
+    if (el) el.classList.remove('hidden');
+  }
+  function hideWakeOverlay() {
+    var el = $('wake-overlay');
+    if (el) el.classList.add('hidden');
+  }
 
   function onAppWake() {
     var now = Date.now();
     if (now - _lastWakeAt < WAKE_MIN_GAP_MS) return;
     _lastWakeAt = now;
+
+    showWakeOverlay();
+    var shownAt = Date.now();
 
     tick();
 
@@ -443,6 +488,17 @@ if (pinReady) {
     if (cp === 'jelly'     && window._jellyRefresh)      window._jellyRefresh();
     if (cp === 'smarthome') loadSmartHome(false);
     if (cp === 'server'    && window._serverWakeRefresh) window._serverWakeRefresh();
+
+    clearTimeout(_wakeOverlayTimer);
+    (function waitForIdle() {
+      var elapsed = Date.now() - shownAt;
+      var idle = _pendingXhrCount <= 0 && elapsed >= WAKE_OVERLAY_MIN_MS;
+      if (idle || elapsed >= WAKE_OVERLAY_MAX_MS) {
+        hideWakeOverlay();
+        return;
+      }
+      _wakeOverlayTimer = setTimeout(waitForIdle, 150);
+    })();
   }
 
   document.addEventListener('visibilitychange', function () {
@@ -4565,5 +4621,134 @@ if (pinReady) {
       });
     })(fsButtons[fi]);
   }
+
+})();
+
+/* ════════════════════════════════════════════════════════
+   TAP SOUND MODULE — ES5, iOS 9 safe
+   A light click on every meaningful tap, the same role as the iOS
+   keyboard click: instant confirmation that the tap registered.
+   Self-contained (own localStorage key, own settings toggle), no
+   dependency on any other module.
+   ════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  var LS_TAPSOUND = 'gres_tapsound'; /* 'on' | 'off' */
+
+  function lsGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function lsSet(key, val) {
+    try { localStorage.setItem(key, val); } catch (e) {}
+  }
+
+  var savedTapSound = lsGet(LS_TAPSOUND);
+  var enabled = (savedTapSound !== 'off'); /* default on */
+
+  var toggle = document.getElementById('toggle-tap-sound');
+  function applyTapSoundToggle() {
+    if (!toggle) return;
+    if (enabled) toggle.classList.add('on');
+    else toggle.classList.remove('on');
+  }
+  applyTapSoundToggle();
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      enabled = !enabled;
+      applyTapSoundToggle();
+      lsSet(LS_TAPSOUND, enabled ? 'on' : 'off');
+    });
+  }
+
+  /* ── synthesized click ─────────────────────────────────
+     A short highpass-filtered noise burst reads as a percussive
+     "click" — a plain oscillator tone reads as a beep instead. The
+     AudioContext is created lazily, the first time playClick() runs
+     from inside a real touchstart handler: iOS refuses to produce
+     audio from a context built outside a user gesture, so it can't be
+     constructed at module-load time. One context/buffer is created
+     and reused for the whole session. */
+  var Ctx = window.AudioContext || window.webkitAudioContext;
+  var ctx = null;
+  var noiseBuffer = null;
+
+  function ensureCtx() {
+    if (!Ctx) return null;
+    if (!ctx) ctx = new Ctx();
+    if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
+    return ctx;
+  }
+
+  function playClick() {
+    var c = ensureCtx();
+    if (!c) return;
+    if (!noiseBuffer) {
+      var len = Math.floor(c.sampleRate * 0.02); /* 20ms */
+      noiseBuffer = c.createBuffer(1, len, c.sampleRate);
+      var data = noiseBuffer.getChannelData(0);
+      for (var i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    }
+    var src = c.createBufferSource();
+    src.buffer = noiseBuffer;
+    var filter = c.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 2500; /* bright "tick", not a hiss */
+    var gain = c.createGain();
+    var now = c.currentTime;
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02); /* fast decay = percussive */
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(c.destination);
+    src.start(now);
+    src.stop(now + 0.03);
+  }
+
+  /* ── delegated tap detection ────────────────────────────
+     Most tap targets in this app are plain divs with a click listener
+     (device tiles, Proxmox tree rows, Jellyfin cards, the on/off
+     switches), not <button> elements, so this can't just listen for
+     button presses. Manual DOM-walk, same style as the PIN keypad's
+     handleKeypadInput — matches() / closest() aren't relied on here
+     since they're not guaranteed on iOS 9.3. Anything missed is a
+     one-line addition to TAP_CLASSES, not a new listener. */
+  var TAP_CLASSES = ['device-card', 'power-toggle', 'power-knob',
+    'jelly-card', 'px-tree-item', 'mk-fav-item', 'w-head-btn'];
+
+  function isTapTarget(el) {
+    var depth = 0;
+    while (el && el !== document.body && depth < 6) {
+      if (el.tagName === 'BUTTON') return true;
+      if (el.classList) {
+        for (var i = 0; i < TAP_CLASSES.length; i++) {
+          if (el.classList.contains(TAP_CLASSES[i])) return true;
+        }
+      }
+      el = el.parentNode;
+      depth++;
+    }
+    return false;
+  }
+
+  /* A real key click fires on press-down, not release, so touchstart
+     is both the most keyboard-like trigger and the reliable place to
+     unlock iOS audio. click is kept only for non-touch input (desktop
+     testing); the timestamp guard stops a touch-originated tap from
+     also playing via the synthetic click that follows it. Listen-only
+     — no preventDefault/stopPropagation — so this can never interfere
+     with any existing handler, bindFastInteraction included. */
+  var _lastTouchAt = 0;
+
+  document.addEventListener('touchstart', function (e) {
+    if (!enabled || !isTapTarget(e.target)) return;
+    _lastTouchAt = Date.now();
+    playClick();
+  }, false);
+
+  document.addEventListener('click', function (e) {
+    if (Date.now() - _lastTouchAt < 500) return;
+    if (enabled && isTapTarget(e.target)) playClick();
+  }, false);
 
 })();
