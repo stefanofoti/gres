@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
-    "jest": "^29.7.0",
+    "jest": "^30.5.1",
     "jest-environment-jsdom": "^29.7.0",
     "supertest": "^6.3.4"
   }
