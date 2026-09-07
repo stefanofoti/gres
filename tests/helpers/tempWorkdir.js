@@ -13,11 +13,12 @@
  * closed-over DATA_FILE — silently leaking state between tests. Only
  * jest.resetModules() actually clears Jest's registry.
  *
- * Because resetModules() clears EVERYTHING (including already-mocked deps
- * like node-fetch), any test file that also does jest.mock('node-fetch')
- * (or similar) must re-require that mocked module *after* useTempWorkdir()
- * runs, in the same beforeEach, to pick up the fresh mock instance the
- * freshly-required route will actually call.
+ * Because resetModules() clears EVERYTHING, any test file that mocks a
+ * module the route pulls in via require() must re-require it *after*
+ * useTempWorkdir() runs, in the same beforeEach, to pick up the fresh mock
+ * instance the freshly-required route will actually call. (Routes that
+ * call the global `fetch` instead of require()-ing it are unaffected —
+ * see homeassistant/jellyfin/weather tests, which stub global.fetch.)
  */
 
 var fs = require('fs');
