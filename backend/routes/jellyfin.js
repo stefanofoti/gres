@@ -19,7 +19,7 @@
 
 var express = require('express');
 var router  = express.Router();
-var fetch   = require('node-fetch');
+var Readable = require('stream').Readable;
 var store   = require('../lib/settingsStore');
 
 /* ── Config helpers ─────────────────────────────────────── */
@@ -64,7 +64,7 @@ function jfFetch(apiPath, config, cb) {
     cb('Jellyfin non configurato', null);
     return;
   }
-  fetch(config.url + apiPath, { headers: jfHeaders(config.token), timeout: 10000 })
+  fetch(config.url + apiPath, { headers: jfHeaders(config.token), signal: AbortSignal.timeout(10000) })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -290,7 +290,7 @@ router.get('/play/stream', function (req, res) {
 
   var upstreamUrl = cfg.url + upstreamPath;
 
-  fetch(upstreamUrl, { headers: jfHeaders(cfg.token), timeout: 15000 })
+  fetch(upstreamUrl, { headers: jfHeaders(cfg.token), signal: AbortSignal.timeout(15000) })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       var contentType = (r.headers.get('content-type') || '').toLowerCase();
@@ -324,7 +324,7 @@ router.get('/play/stream', function (req, res) {
 
       res.setHeader('Content-Type', r.headers.get('content-type') || 'application/octet-stream');
       res.setHeader('Cache-Control', 'no-store');
-      r.body.pipe(res);
+      Readable.fromWeb(r.body).pipe(res);
       return null;
     })
     .catch(function (e) {
@@ -473,13 +473,13 @@ router.get('/image/:itemId', function (req, res) {
 
   req.log.debug({ itemId: req.params.itemId, maxH: maxH }, 'proxying Jellyfin image');
 
-  fetch(imgUrl, { headers: jfHeaders(cfg.token), timeout: 10000 })
+  fetch(imgUrl, { headers: jfHeaders(cfg.token), signal: AbortSignal.timeout(10000) })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       res.setHeader('Content-Type',  r.headers.get('content-type') || 'image/jpeg');
       /* Cache covers for 24 hours in the browser */
       res.setHeader('Cache-Control', 'public, max-age=86400');
-      r.body.pipe(res);
+      Readable.fromWeb(r.body).pipe(res);
     })
     .catch(function (e) {
       req.log.warn({ err: e.message, itemId: req.params.itemId }, 'image proxy failed');

@@ -2,7 +2,6 @@
 
 var express = require('express');
 var router = express.Router();
-var fetch = require('node-fetch');
 var fs   = require('fs');
 var path = require('path');
 var store = require('../lib/settingsStore');
@@ -206,7 +205,7 @@ router.get('/home-summary', function (req, res) {
     '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
     '&forecast_days=4';
 
-  fetch(url, { headers: weatherHeaders(), timeout: 30000 })
+  fetch(url, { headers: weatherHeaders(), signal: AbortSignal.timeout(30000) })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -263,7 +262,7 @@ router.get('/search', function (req, res) {
     encodeURIComponent(q) +
     '&count=8&language=it&format=json';
 
-  fetch(url, { headers: weatherHeaders(), timeout: 30000 })
+  fetch(url, { headers: weatherHeaders(), signal: AbortSignal.timeout(30000) })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
@@ -331,7 +330,7 @@ router.get('/forecast', function (req, res) {
       'apparent_temperature_max,apparent_temperature_min,daylight_duration,sunshine_duration' +
     '&forecast_days=10';
 
-  fetch(url, { headers: weatherHeaders(), timeout: 30000 })
+  fetch(url, { headers: weatherHeaders(), signal: AbortSignal.timeout(30000) })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
