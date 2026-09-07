@@ -21,7 +21,6 @@
 
 var express = require('express');
 var router  = express.Router();
-var fetch   = require('node-fetch');
 var session = require('../middleware/session');
 var store   = require('../lib/settingsStore');
 
@@ -117,7 +116,7 @@ function filterRelevantEntities(entities, domain) {
 function fetchRelevantEntities(config, domain) {
   return fetch(config.url + '/api/states', {
     headers: haHeaders(config.token),
-    timeout: 8000
+    signal: AbortSignal.timeout(8000)
   })
     .then(function (r) { return r.json(); })
     .then(function (entities) {
@@ -208,7 +207,7 @@ router.get('/status', function (req, res) {
     return res.json({ connected: false, error: 'No HA configuration found' });
   }
   req.log.debug({ haUrl: config.url }, 'checking HA status');
-  fetch(config.url + '/api/', { headers: haHeaders(config.token), timeout: 5000 })
+  fetch(config.url + '/api/', { headers: haHeaders(config.token), signal: AbortSignal.timeout(5000) })
     .then(function (r) { return r.json(); })
     .then(function (data) {
       req.log.info('HA connection OK');
@@ -284,7 +283,7 @@ router.get('/entity/:entity_id', function (req, res) {
   }
   req.log.debug({ entityId: req.params.entity_id }, 'fetching single entity');
   fetch(config.url + '/api/states/' + req.params.entity_id, {
-    headers: haHeaders(config.token), timeout: 5000
+    headers: haHeaders(config.token), signal: AbortSignal.timeout(5000)
   })
     .then(function (r) { return r.json(); })
     .then(function (data) { res.json(data); })
@@ -329,7 +328,7 @@ router.post('/service', function (req, res) {
     method:  'POST',
     headers: haHeaders(config.token),
     body:    JSON.stringify(serviceData),
-    timeout: 8000
+    signal:  AbortSignal.timeout(8000)
   })
     .then(function (r) { return r.json(); })
     .then(function (data) {

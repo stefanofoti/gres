@@ -6,8 +6,7 @@ var fs = require('fs');
 var path = require('path');
 var wd = require('../helpers/tempWorkdir');
 
-jest.mock('node-fetch');
-var fetch; // reacquired fresh in beforeEach, after resetModules — see helpers/tempWorkdir.js
+var fetch; // reassigned fresh in beforeEach — see helpers/tempWorkdir.js
 
 var HA_ROUTE = path.join(__dirname, '../../backend/routes/homeassistant');
 
@@ -33,7 +32,7 @@ function jsonRes(body, ok) {
   return { ok: ok !== false, json: function () { return Promise.resolve(body); } };
 }
 
-beforeEach(function () { wd.useTempWorkdir(); fetch = require('node-fetch'); });
+beforeEach(function () { wd.useTempWorkdir(); fetch = global.fetch = jest.fn(); });
 afterEach(function () { wd.restoreWorkdir(); });
 
 describe('GET /api/ha/status', function () {
