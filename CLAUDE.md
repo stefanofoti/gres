@@ -48,7 +48,7 @@ npm run test:visual:capture  # re-record tests/visual/fixtures from a live backe
 
 There is no module system, so **load order is the dependency graph**: `widgets.js` must come before `app.js` in `index.html` (enforced by a test in `es5-compat.test.js`). `widgets.js` only *defines* things — it fires no request at parse time and resolves `window._xhr` and friends when a widget actually renders, so the ordering never becomes a race.
 
-`app.js` is a sequence of IIFE modules (HOME, MARKETS, WEATHER, JELLYFIN, PROXMOX, FEATURES, APPEARANCE), each self-contained. They communicate **only** through a small set of `window._*` globals — this is the app's internal API and the thing to read first when tracing cross-tab behaviour:
+`app.js` is a sequence of IIFE modules (HOME, MARKETS, WEATHER, JELLYFIN, PROXMOX, FEATURES, APPEARANCE, UPDATE), each self-contained. They communicate **only** through a small set of `window._*` globals — this is the app's internal API and the thing to read first when tracing cross-tab behaviour:
 
 - `window._xhr(method, url, body, cb)` — the single HTTP entry point (XHR, not fetch). Everything must go through it: this is where the feature-disable gate lives.
 - `window._showPage` / `window._currentPage` — tab routing
@@ -68,6 +68,18 @@ The Home tab is one wrapping flex grid (`.w-grid`) of cards, built from the `hom
 - Adding a widget: register it in `widgets.js`, add its `html.light` overrides (the light theme is explicit overrides, not tokens), add a fixture to `tests/visual/fixtures/` plus a `_manifest.json` entry, and add the entry to the fixture `settings.json` so the visual suite actually renders it.
 
 Every page lives in `index.html` as a `.page` div, shown/hidden by tab; nothing is routed or lazily loaded.
+
+### Knowing when the page is stale
+
+`index.html` is requested once per app launch and never again — no router, no build step — so on the wall panel a deploy stays invisible until someone quits and reopens the web app. Service workers would be the normal answer and need iOS 11.3, so instead the version is compared:
+
+- `backend/lib/appVersion.js` is the one release identifier (package.json's `version`, which CI refuses to publish unless it matches the pushed tag).
+- `backend/lib/indexHtml.js` renders `index.html` with that version substituted into `__APP_VERSION__` and sends it `no-cache`. It is registered **before** `express.static`, which would otherwise answer `/` with the raw file and leak the placeholder. The SPA fallback uses the same handler.
+- `/api/config` reports the version the **server** is on. The UPDATE module in `app.js` compares the two: a mismatch means the browser is running a cached page.
+
+Nothing reloads by itself — the module only sets the Settings → Software readout and toasts once. An unattended reload would drop the visible state, re-lock the Settings PIN (in-memory only) and, since `index.html` pulls Chartist and the fonts from a CDN, could land while the internet is down and leave the panel worse off than the stale-but-working page. Self-host those two before revisiting that decision.
+
+Served without substitution (opening the file directly, a plain static host) the placeholder survives and the check disables itself rather than reading `__APP_VERSION__` as an old release. `tests/visual/static-server.js` stamps a pinned `0.0.0-test` instead, matching `fixtures/config.json`, for the same reason `Date` is frozen — the Settings tab prints the version, and the real one would invalidate that baseline every release. `capture-fixtures.js` pins it too.
 
 ### Weather tab
 

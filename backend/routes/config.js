@@ -9,6 +9,7 @@
 
 var express = require('express');
 var router  = express.Router();
+var VERSION = require('../lib/appVersion');
 
 /**
  * Parse HA_REFRESH_INTERVAL_SEC from the environment.
@@ -26,7 +27,12 @@ function parseHaRefreshIntervalSec() {
 
 router.get('/', function (req, res) {
   res.json({
-    haRefreshIntervalSec: parseHaRefreshIntervalSec()
+    haRefreshIntervalSec: parseHaRefreshIntervalSec(),
+    /* The release this SERVER is running. The page compares it against the
+       version stamped into its own HTML (lib/indexHtml.js) to notice that
+       it is still running an older release out of the browser cache — the
+       normal state of the wall panel between a deploy and an app restart. */
+    version: VERSION
   });
 });
 

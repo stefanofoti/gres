@@ -28,6 +28,7 @@ var rateLimit     = require('express-rate-limit');
 var logger        = require('./logger');
 var requestLogger = require('./middleware/requestLogger');
 var session       = require('./middleware/session');
+var indexHtml     = require('./lib/indexHtml');
 
 var app  = express();
 var PORT = process.env.PORT || 3000;
@@ -63,6 +64,13 @@ app.use(express.json());
    (a pino child logger with a unique requestId) to every
    incoming request.                                    */
 app.use(requestLogger);
+
+/* The HTML entry point is rendered rather than served from disk: it carries
+   the running version stamped into a <meta> tag, which is how the client
+   detects that it is still running the code of an older release (see
+   lib/indexHtml.js). It must be registered BEFORE express.static, which
+   would otherwise answer '/' with the raw file and leak the placeholder. */
+app.get(['/', '/index.html'], indexHtml.serveIndex);
 
 /* Serve compiled/static frontend assets from ./frontend */
 app.use(express.static(path.join(__dirname, '../frontend')));
@@ -156,9 +164,7 @@ app.use('/api', function (req, res) {
 /* ── SPA fallback ───────────────────────────────────────
    Any non-API path returns index.html so that the
    single-page app can handle client-side navigation.  */
-app.get('/*splat', function (req, res) {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
-});
+app.get('/*splat', indexHtml.serveIndex);
 
 /* ── Global error handler ───────────────────────────────
    Catches any error passed to next(err) in route

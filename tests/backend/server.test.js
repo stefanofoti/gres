@@ -72,6 +72,25 @@ test('GET / serves the frontend index.html', function () {
   });
 });
 
+/* The version stamp is what lets a long-lived page notice it is running
+   older code than the server. Serving the raw file — which express.static
+   would happily do for '/' if the render handler were ever registered after
+   it — leaks the placeholder, and the client then disables its own check. */
+test('GET / stamps the running version into the HTML', function () {
+  var pkg = require('../../package.json');
+  return request(baseUrl).get('/').expect(200).then(function (res) {
+    expect(res.text).not.toContain('__APP_VERSION__');
+    expect(res.text).toContain('<meta name="app-version" content="' + pkg.version + '">');
+    expect(res.headers['cache-control']).toMatch(/no-cache/);
+  });
+});
+
+test('GET /index.html is rendered too, not served raw by express.static', function () {
+  return request(baseUrl).get('/index.html').expect(200).then(function (res) {
+    expect(res.text).not.toContain('__APP_VERSION__');
+  });
+});
+
 test('GET /js/app.js serves the ES5 frontend bundle', function () {
   return request(baseUrl).get('/js/app.js').expect(200).then(function (res) {
     expect(res.text).toContain('HomeApp');

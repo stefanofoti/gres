@@ -1,3 +1,4 @@
 {
-  "haRefreshIntervalSec": 15
+  "haRefreshIntervalSec": 15,
+  "version": "0.0.0-test"
 }

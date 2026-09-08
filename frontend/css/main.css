@@ -2803,6 +2803,34 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
   color: var(--text-bright);
 }
 
+/* ── Software block ──────────────────────────────────
+   Reuses .appearance-row for layout; only the readouts are
+   new. .sw-status is nested under the row label rather than
+   placed beside it because its longest string ("Version
+   0.0.13 available") would otherwise fight the button for
+   width on a 320px phone. .btn-secondary carries flex: 1
+   for the form footers it was written for, which inside a
+   space-between row would stretch it across the whole
+   width — hence the reset below. */
+.sw-value {
+  font-family: 'DM Mono', monospace;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.sw-status {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-3xs);
+}
+.sw-status--update { color: var(--accent-bright); }
+.sw-reload-btn {
+  -webkit-box-flex: 0; -webkit-flex: 0 0 auto; flex: 0 0 auto;
+  padding: var(--space-sm) var(--space-base);
+  font-size: var(--text-sm);
+  margin-left: var(--space-md);
+}
+
 /* Status bar hide/show transition */
 #status-bar {
   -webkit-transition: height 0.25s, opacity 0.25s, padding 0.25s;
@@ -3084,6 +3112,9 @@ html.light .settings-block-desc  { color: #8080a0; }
 html.light .appearance-row       { border-bottom-color: #d0d0da; }
 html.light .appearance-row-label { color: #28283a; }
 html.light .appearance-row-icon  { color: #5050c8; }
+html.light .sw-value             { color: #8080a0; }
+html.light .sw-status            { color: #8080a0; }
+html.light .sw-status--update    { color: #5050c8; }
 html.light .feature-row-icon     { color: #5050c8; }
 
 /* feat accordion */

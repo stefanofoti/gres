@@ -4761,3 +4761,120 @@ if (pinReady) {
   }, false);
 
 })();
+
+/* ════════════════════════════════════════════════════════
+   UPDATE MODULE — ES5, iOS 9 safe
+   Tells the user when the page is running an older release
+   than the server, and gives them a way to fix it.
+
+   The problem it solves: this is a single page with no
+   router and no build step, so after the first load
+   index.html is never requested again. On the wall panel —
+   a Home-screen web app under Guided Access — that means a
+   deploy is invisible until someone quits and reopens the
+   app, which nobody does, so the panel can sit weeks behind.
+
+   Service workers (the modern answer) need iOS 11.3; this
+   targets 9.3. So the mechanism is deliberately plain: the
+   version is stamped into the HTML at serve time
+   (backend/lib/indexHtml.js) and compared against
+   /api/config, which reports what the SERVER is on. A
+   mismatch means the browser handed us a cached page.
+
+   Nothing reloads by itself. An unattended reload would drop
+   whatever is on screen, re-lock the Settings PIN (it is
+   in-memory only) and — since index.html pulls Chartist and
+   the fonts from a CDN — could land while the internet is
+   down and leave the panel worse off than the stale-but-
+   working page it replaced. So the reload is always a tap.
+   ════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  /* Slow on purpose: this only has to beat "never", and the
+     panel is a 24/7 client. A wake from standby is the more
+     useful trigger of the two. */
+  var POLL_MS      = 10 * 60 * 1000;
+  var WAKE_GAP_MS  = 60 * 1000;
+
+  function $(id) { return document.getElementById(id); }
+
+  var versionEl = $('sw-version');
+  var statusEl  = $('sw-status');
+  var reloadBtn = $('sw-reload');
+
+  /* Only the <head> carries the stamp, and some hosts serve
+     frontend/ as plain files (the visual harness, opening the
+     file directly, jsdom tests that mount <body> alone). In
+     every one of those the placeholder survives untouched or
+     the tag is absent — there is no release identity to
+     compare against, so the check disables itself rather than
+     reporting a phantom update. */
+  var metaEl  = document.querySelector ? document.querySelector('meta[name="app-version"]') : null;
+  var running = metaEl ? (metaEl.getAttribute('content') || '') : '';
+  var stamped = !!running && running.indexOf('__') !== 0;
+
+  if (versionEl) versionEl.textContent = stamped ? running : 'unknown';
+
+  function setStatus(text, isUpdate) {
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    if (isUpdate) statusEl.classList.add('sw-status--update');
+    else          statusEl.classList.remove('sw-status--update');
+  }
+
+  /* The toast fires once per page load, not once per check —
+     otherwise a panel left un-reloaded would interrupt the
+     view every ten minutes, forever. */
+  var announced = false;
+
+  function check() {
+    if (!stamped) return;
+    window._xhr('GET', '/api/config', null, function (err, cfg) {
+      if (err || !cfg || !cfg.version) { setStatus('Version check unavailable', false); return; }
+      if (cfg.version === running) { setStatus('Up to date', false); return; }
+      setStatus('Version ' + cfg.version + ' available', true);
+      if (!announced) {
+        announced = true;
+        if (window._toast) window._toast('Update available — reload from Settings', 4000);
+      }
+    });
+  }
+
+  if (!stamped) setStatus('Version unknown', false);
+  else          check();
+
+  if (reloadBtn) {
+    reloadBtn.addEventListener('click', function () {
+      setStatus('Reloading…', false);
+      /* reload() and not a location assignment: in a Home-screen
+         web app a navigation can bounce the user out into
+         Safari, which under Guided Access is a dead end. The
+         boolean "force" argument is non-standard and ignored by
+         WebKit, so it is not passed — the reload already
+         revalidates, since index.html is sent no-cache and
+         everything else max-age=0 with an ETag. */
+      window.location.reload();
+    }, false);
+  }
+
+  /* A wake from standby is when a stale panel is most likely to
+     be looked at, and the cheapest moment to notice. Debounced
+     the same way onAppWake is, since iOS can fire
+     visibilitychange and pageshow for one unlock. */
+  var lastCheckAt = 0;
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) return;
+    var now = Date.now();
+    if (now - lastCheckAt < WAKE_GAP_MS) return;
+    lastCheckAt = now;
+    check();
+  }, false);
+
+  setInterval(function () {
+    if (document.hidden) return;
+    lastCheckAt = Date.now();
+    check();
+  }, POLL_MS);
+
+})();

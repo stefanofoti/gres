@@ -977,3 +977,97 @@ describe('weather day browser', function () {
     });
   });
 });
+
+/* ── update check ─────────────────────────────────────────
+   The page is loaded once and then runs for weeks on the wall
+   panel, so "am I still the current release?" cannot be answered
+   from /api/config alone — that reports the server. The answer
+   comes from comparing it against the stamp the backend wrote
+   into this page's HTML at serve time.
+
+   loadApp() mounts only <body>, exactly like a bare static host
+   serving frontend/ untouched, so the stamp has to be planted in
+   <head> by hand here — which is also the case the module has to
+   survive without inventing an update. */
+describe('update check (Software block)', function () {
+  function stamp(version) {
+    document.head.innerHTML = '<meta name="app-version" content="' + version + '">';
+  }
+  function serving(version) {
+    return function (method, url) {
+      if (url.indexOf('/api/config') !== -1) {
+        return { status: 200, body: { haRefreshIntervalSec: 0, version: version } };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url);
+    };
+  }
+
+  afterEach(function () { document.head.innerHTML = ''; });
+
+  test('reports up to date when the page and the server are on the same release', function () {
+    stamp('0.0.12');
+    loadApp(serving('0.0.12'));
+    return flush().then(function () {
+      expect(document.getElementById('sw-version').textContent).toBe('0.0.12');
+      expect(document.getElementById('sw-status').textContent).toBe('Up to date');
+      expect(document.getElementById('sw-status').classList.contains('sw-status--update')).toBe(false);
+    });
+  });
+
+  test('names the newer release and toasts once when the page is behind', function () {
+    stamp('0.0.12');
+    loadApp(serving('0.0.13'));
+    return flush().then(function () {
+      var status = document.getElementById('sw-status');
+      expect(status.textContent).toBe('Version 0.0.13 available');
+      expect(status.classList.contains('sw-status--update')).toBe(true);
+      expect(document.getElementById('toast').textContent).toContain('Update available');
+    });
+  });
+
+  /* Served raw (no backend substitution) the placeholder survives. There is
+     no release identity to compare, so the check must go quiet rather than
+     read '__APP_VERSION__' as an old version and cry update forever. */
+  test('disables itself when the HTML was served without a version stamp', function () {
+    stamp('__APP_VERSION__');
+    var seen = [];
+    loadApp(function (method, url) {
+      seen.push(url);
+      return mockXhrHelper.defaultRouteHandler(method, url);
+    });
+    return flush().then(function () {
+      expect(document.getElementById('sw-version').textContent).toBe('unknown');
+      expect(document.getElementById('sw-status').textContent).toBe('Version unknown');
+      expect(document.getElementById('toast').classList.contains('show')).toBe(false);
+    });
+  });
+
+  test('survives a page with no version meta at all', function () {
+    loadApp();
+    return flush().then(function () {
+      expect(document.getElementById('sw-version').textContent).toBe('unknown');
+      expect(document.getElementById('sw-status').textContent).toBe('Version unknown');
+    });
+  });
+
+  test('re-checks when the app comes back from standby', function () {
+    stamp('0.0.12');
+    /* Deploy while the panel sleeps: the answer changes between the boot
+       check and the wake. */
+    var serverVersion = '0.0.12';
+    loadApp(function (method, url) {
+      if (url.indexOf('/api/config') !== -1) {
+        return { status: 200, body: { haRefreshIntervalSec: 0, version: serverVersion } };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url);
+    });
+    return flush().then(function () {
+      expect(document.getElementById('sw-status').textContent).toBe('Up to date');
+      serverVersion = '0.0.13';
+      document.dispatchEvent(new Event('visibilitychange'));
+      return flush();
+    }).then(function () {
+      expect(document.getElementById('sw-status').textContent).toBe('Version 0.0.13 available');
+    });
+  });
+});

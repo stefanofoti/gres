@@ -6,6 +6,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#0a0a0f">
+  <!-- Stamped by backend/lib/indexHtml.js at serve time. This is the version
+       of the code the browser is ACTUALLY running, which is not necessarily
+       the one the server is on: the page is fetched once at app launch and
+       then lives for weeks on the wall panel. The UPDATE module in app.js
+       compares it against /api/config. Served raw (dev, tests) the
+       placeholder stays put and the check disables itself. -->
+  <meta name="app-version" content="__APP_VERSION__">
   <title>Gres</title>
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chartist/0.11.4/chartist.min.css">
@@ -519,6 +526,38 @@
             <div class="spinner-sm"></div>
           </div>
           <div class="feat-acc-list" id="devlock-list"></div>
+        </div>
+
+        <!-- ── Software ───────────────────────────── -->
+        <div class="settings-block" id="software-block">
+          <div class="settings-block-title">Software</div>
+          <div class="settings-block-desc">The app keeps running the code it loaded when it was opened, so a new release only takes effect after a reload. Nothing reloads on its own — use the button below.</div>
+
+          <div class="appearance-row">
+            <div class="appearance-row-left">
+              <div class="appearance-row-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="4" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/>
+                  <path d="M8 21h8M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="appearance-row-label">Running version</div>
+            </div>
+            <div class="sw-value" id="sw-version">—</div>
+          </div>
+
+          <div class="appearance-row">
+            <div class="appearance-row-left">
+              <div class="appearance-row-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                  <path d="M20 4v4h-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="appearance-row-label">Reload app<div class="sw-status" id="sw-status">Checking…</div></div>
+            </div>
+            <button type="button" class="btn-secondary sw-reload-btn" id="sw-reload">Reload</button>
+          </div>
         </div>
 
         <div class="settings-block settings-block-placeholder">

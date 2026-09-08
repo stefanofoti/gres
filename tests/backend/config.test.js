@@ -4,6 +4,7 @@ var express = require('express');
 var request = require('supertest');
 var wd = require('../helpers/tempWorkdir');
 var config = require('../../backend/routes/config');
+var pkg = require('../../package.json');
 
 /* config.js reads process.env at call time (not require time) and touches
    no files, so no temp-workdir / fresh-require dance is needed here. */
@@ -57,7 +58,18 @@ describe('GET /api/config', function () {
     process.env.HA_REFRESH_INTERVAL_SEC = '42';
     var app = buildApp();
     return request(app).get('/api/config').expect(200).then(function (res) {
-      expect(res.body).toEqual({ haRefreshIntervalSec: 42 });
+      expect(res.body).toEqual({ haRefreshIntervalSec: 42, version: pkg.version });
+    });
+  });
+
+  /* The frontend's stale-client check compares this against the version
+     stamped into its own HTML, so an absent or renamed field silently turns
+     the check off rather than failing loudly. */
+  test('reports the package version, which CI pins to the release tag', function () {
+    var app = buildApp();
+    return request(app).get('/api/config').expect(200).then(function (res) {
+      expect(typeof res.body.version).toBe('string');
+      expect(res.body.version).toBe(pkg.version);
     });
   });
 });

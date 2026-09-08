@@ -113,8 +113,17 @@ function keyFor(urlPath) {
     try {
       var body = await res.json();
       if (u.pathname === '/api/jf/userid' && body && body.userId) realUserId = body.userId;
+      var clean = redact(body);
+      /* The Settings tab prints the running version, and the visual static
+         server stamps a pinned fake one into index.html (see PINNED_VERSION
+         there). Recording this machine's real package.json version instead
+         would make the Settings baselines show "update available" and break
+         them again on every release. Pinned here rather than in REDACT
+         because that map is keyed by field name, and 'version' also carries
+         the genuine Proxmox VE version the Server tab renders. */
+      if (u.pathname === '/api/config' && clean && clean.version) clean.version = '0.0.0-test';
       captured[keyFor(u.pathname + u.search)] = {
-        path: u.pathname, search: u.search, status: res.status(), body: redact(body)
+        path: u.pathname, search: u.search, status: res.status(), body: clean
       };
     } catch (e) { /* non-JSON or already consumed — skip */ }
   });

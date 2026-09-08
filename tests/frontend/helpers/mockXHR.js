@@ -35,7 +35,7 @@ function installMockXHR(routeHandler) {
 function defaultRouteHandler(method, url) {
   if (url.indexOf('/api/auth/pin-status') !== -1) return { status: 200, body: { required: false, length: 0 } };
   if (url.indexOf('/api/ha/status') !== -1) return { status: 200, body: { connected: false } };
-  if (url.indexOf('/api/config') !== -1) return { status: 200, body: { haRefreshIntervalSec: 0 } };
+  if (url.indexOf('/api/config') !== -1) return { status: 200, body: { haRefreshIntervalSec: 0, version: '0.0.0-test' } };
   if (url.indexOf('/api/settings') !== -1) return { status: 200, body: {} };
   return { status: 404, body: { error: 'not found' } };
 }
