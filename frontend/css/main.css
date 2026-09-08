@@ -1260,14 +1260,30 @@ html, body {
   white-space: nowrap; margin-left: var(--space-sm);
   -webkit-flex-shrink: 0; flex-shrink: 0;
 }
+/* Icon-only <button>, so its box is sized to fit the icon EXACTLY and
+   nothing is left to centre: 26px border-box = 1px border + 5px padding
+   + 14px icon + 5px padding + 1px border, on both axes. That literal
+   chain is the whole point — iOS 9.3 centres a button's contents with
+   its own control metrics, and none of the usual levers reach it there:
+   a <button> is not a flex container until Safari 11 (so align-items /
+   justify-content are silently dead), and text-align only ever centred
+   this horizontally. Change the 26px, the padding or the icon's 14px
+   and you must change the others. `font-family` is restated because
+   form controls do not inherit it — same reason as .wx-day. */
 .w-head-btn {
   width: 26px; height: 26px; min-width: 26px; margin-left: var(--space-sm);
   border-radius: var(--radius-sm); border: 1px solid var(--border-accent);
   background: var(--surface-raised); color: var(--text-muted-accent);
-  font-size: var(--text-md); line-height: 1; padding: 0;
+  font-family: inherit; font-size: var(--text-md);
+  line-height: 0; padding: 5px; text-align: center;
+  -webkit-appearance: none; appearance: none;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
   -webkit-flex-shrink: 0; flex-shrink: 0;
 }
+/* block, so it is not a baseline-aligned inline box inside the button's
+   anonymous line box — with the exact fit above there is no slack left
+   for the baseline to shift it into. */
+.w-head-btn > svg { display: block; }
 .w-head-btn:active { opacity: 0.65; }
 .w-head-btn.is-busy { opacity: 0.45; pointer-events: none; }
 

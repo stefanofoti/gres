@@ -164,11 +164,23 @@
       },
 
       /* Header action button (refresh, all-off, …). Its click never
-         reaches the card's own onTap. */
-      addAction: function (label, title, onClick) {
-        var btn = el('button', 'w-head-btn', label);
+         reaches the card's own onTap.
+
+         `icon` is SVG markup from ACTION_ICONS, not text — same
+         convention as opts.icon above. It used to be a bare Unicode
+         glyph, which iOS 9.3 resolved through the UA control font's
+         fallback chain (buttons do not inherit font-family) and, for
+         U+23FB POWER SYMBOL, could not resolve at all: that codepoint
+         is Unicode 9.0, newer than the device. The button carries no
+         text now, so `title` also becomes the accessible name. */
+      addAction: function (icon, title, onClick) {
+        var btn = el('button', 'w-head-btn');
         btn.type = 'button';
-        if (title) btn.title = title;
+        btn.innerHTML = icon;
+        if (title) {
+          btn.title = title;
+          btn.setAttribute('aria-label', title);
+        }
         btn.addEventListener('click', function (ev) {
           ev.stopPropagation();
           ev.preventDefault();
@@ -237,6 +249,19 @@
       '<rect x="2" y="3" width="20" height="6" rx="2" stroke="currentColor" stroke-width="1.8"/>' +
       '<rect x="2" y="13" width="20" height="6" rx="2" stroke="currentColor" stroke-width="1.8"/>' +
       '<circle cx="18" cy="6" r="1" fill="currentColor"/><circle cx="18" cy="16" r="1" fill="currentColor"/></svg>'
+  };
+
+  /* Header-action icons, for card.addAction(). 14px is coupled to
+     .w-head-btn's padding — see the comment on that rule. Drawn rather
+     than typed, so no glyph has to exist in the device's fonts. */
+  var ACTION_ICONS = {
+    power: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none">' +
+      '<path d="M12 3v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+      '<path d="M17.2 6.3a7.5 7.5 0 1 1-10.4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+
+    refresh: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none">' +
+      '<path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>' +
+      '<path d="M20 4v4.5h-4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
 
   /* ── navigation helper ───────────────────────────────── */
@@ -455,11 +480,11 @@
       buildHACards(grid, ctx.entries, entities);
       ctx.card.setStatus(haSummaryText(ctx.entries, entities));
 
-      ctx.card.addAction('⏻', 'Turn everything off', function () {
+      ctx.card.addAction(ACTION_ICONS.power, 'Turn everything off', function () {
         allOff(ctx.entries, entities);
       });
 
-      ctx.card.addAction('↻', 'Refresh devices', function (btn) {
+      ctx.card.addAction(ACTION_ICONS.refresh, 'Refresh devices', function (btn) {
         btn.classList.add('is-busy');
         setTimeout(function () { btn.classList.remove('is-busy'); }, 600);
         if (window._refreshHADevices) window._refreshHADevices({ silent: true });

@@ -4743,7 +4743,16 @@ if (pinReady) {
   document.addEventListener('touchstart', function (e) {
     if (!enabled || !isTapTarget(e.target)) return;
     _lastTouchAt = Date.now();
-    playClick();
+    /* ensureCtx() (create/resume) must run synchronously, inside this
+       gesture, or iOS refuses to unlock audio. Everything after that —
+       building the node graph and scheduling start() — doesn't need the
+       gesture once the context is running, so it's deferred a tick. On
+       old/slow WebKit that graph-building is heavy enough to block the
+       main thread and delay the touchend/click that follows, which made
+       the tap's real action appear to wait for the click sound to
+       finish. Deferring it lets that action run first. */
+    ensureCtx();
+    setTimeout(playClick, 0);
   }, false);
 
   document.addEventListener('click', function (e) {
