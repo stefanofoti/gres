@@ -272,38 +272,20 @@
     if (t) t.click();
   }
 
-  /* ── Smart Home device tiles ─────────────────────────── */
-  /* Builds the .device-card tiles for the pinned entities. Exposed so
-     the HOME module can rebuild the grid in place when a poll brings
-     entities in after the card has already been rendered. */
-  var HA_ICONS = {
-    light: '○', switch: '⌁', input_boolean: '⌁',
-    media_player: '▷', climate: '◇', fan: '◎', cover: '▭'
-  };
-  var HA_STATES = {
-    on: 'On', off: 'Off', open: 'Open', closed: 'Closed',
-    playing: 'Playing', paused: 'Paused', idle: 'Idle',
-    unavailable: 'N/A', unknown: '?', standby: 'Standby'
-  };
+  /* ── Smart Home device tiles ─────────────────────────
+     The tiles are built by the SMARTHOME module in app.js and reached
+     through window._haDeviceTile. They used to be built here as well, from
+     a near-copy kept in step by hand through three window globals — and the
+     copies had already drifted: only the tab's tiles carried the in-flight
+     toggle guard, the busy state, the rollback on a failed call and the
+     colour tint for a light that is on with a colour.
 
-  function domainOf(eid)   { return eid.split('.')[0]; }
-  function isOn(e)         { var s = e.state; return s==='on'||s==='open'||s==='playing'||s==='paused'||s==='idle'; }
-  function stateLabel(s)   { return HA_STATES[s] || s; }
+     What stays here is what the widget actually owns: which entities appear
+     — the pinned list, and a placeholder for one HA has not reported — and
+     the "3 of 8 on" count in the card header.
+     ─────────────────────────────────────────────────── */
 
-  /* app.js owns the rich form ("on · 45% · 2700K") and its poll rewrites
-     tiles with it, so build them with the same function or the text
-     changes format on the first refresh. */
-  function stateText(entity) {
-    return window._haStateText ? window._haStateText(entity) : stateLabel(entity.state);
-  }
-
-  /* app.js also owns the canonical icon map, for the same reason — same
-     fallback shape as stateText, needed because this file loads and can
-     run before app.js's globals are set. */
-  function iconFor(domain) {
-    var icons = window._haIcons || HA_ICONS;
-    return icons[domain] || '◈';
-  }
+  function isOn(e) { var s = e.state; return s==='on'||s==='open'||s==='playing'||s==='paused'||s==='idle'; }
 
   /** "3 of 8 on", counting only entities HA actually reported. */
   function haSummaryText(haWidgets, entities) {
@@ -328,113 +310,65 @@
     var status = card.querySelector('.w-status');
     if (status) status.textContent = haSummaryText(haWidgets, entities || []);
   }
-  function friendlyNameFallback(e) {
-    return (e.attributes && e.attributes.friendly_name)
-      ? e.attributes.friendly_name
-      : e.entity_id.split('.')[1].replace(/_/g, ' ');
+
+  /**
+   * Fill the widget's grid from the pinned list. Exposed so the HOME module
+   * can rebuild it in place when a poll brings entities in after the card
+   * has already rendered empty.
+   *
+   * @param {HTMLElement} grid
+   * @param {Array<Object>} haWidgets — pinned home_widgets entries
+   * @param {Array<Object>} entities  — the latest HA snapshot
+   */
+  /**
+   * The current entity snapshot, preferring app.js's live copy over a list
+   * captured at render time.
+   *
+   * @param {Array<Object>} atRender — the ctx.entities fallback
+   * @returns {Array<Object>}
+   */
+  function liveEntities(atRender) {
+    if (window._haEntitySnapshot) {
+      var live = window._haEntitySnapshot();
+      if (live && live.length) return live;
+    }
+    return atRender || [];
   }
-  function friendlyName(e) {
-    return window._haFriendlyName ? window._haFriendlyName(e) : friendlyNameFallback(e);
+
+  /**
+   * The entity objects behind a pinned list, skipping any HA has not
+   * reported. Order follows the pinned entries, not the snapshot.
+   *
+   * @param {Array<Object>} haWidgets — pinned home_widgets entries
+   * @param {Array<Object>} entities
+   * @returns {Array<Object>}
+   */
+  function pinnedEntities(haWidgets, entities) {
+    var map = {}, out = [];
+    for (var i = 0; i < entities.length; i++) map[entities[i].entity_id] = entities[i];
+    for (var k = 0; k < haWidgets.length; k++) {
+      var e = map[haWidgets[k].id];
+      if (e) out.push(e);
+    }
+    return out;
   }
 
   function buildHACards(grid, haWidgets, entities) {
     clear(grid);
+    /* Load order guarantees app.js has run before any widget renders, but a
+       missing builder has to leave an empty grid rather than throw: nothing
+       in this file may take the Home screen down with it. */
+    if (!window._haDeviceTile) return;
+
     var entityMap = {};
     for (var i = 0; i < entities.length; i++) entityMap[entities[i].entity_id] = entities[i];
 
     for (var k = 0; k < haWidgets.length; k++) {
-      (function (w) {
-        var entity = entityMap[w.id];
-
-        /* Pinned but not (yet) reported by HA: keep the slot, so the
-           grid does not reflow when the entity comes back. */
-        if (!entity) {
-          var ghost = el('div', 'device-card unavail');
-          ghost.appendChild(el('div', 'card-icon', '◈'));
-          var gi = el('div', 'card-info');
-          gi.appendChild(el('div', 'card-name', w.label || w.id));
-          gi.appendChild(el('div', 'card-state', 'N/A'));
-          ghost.appendChild(gi);
-          grid.appendChild(ghost);
-          return;
-        }
-
-        var on      = isOn(entity);
-        var unavail = entity.state === 'unavailable';
-        var domain  = domainOf(entity.entity_id);
-
-        var card = el('div', 'device-card' + (on ? ' on' : '') + (unavail ? ' unavail' : ''));
-        card.setAttribute('data-eid', entity.entity_id);
-
-        var ico  = el('div', 'card-icon', iconFor(domain));
-        var info = el('div', 'card-info');
-        info.appendChild(el('div', 'card-name', friendlyName(entity)));
-        var stateEl = el('div', 'card-state', stateText(entity));
-        info.appendChild(stateEl);
-
-        if (domain === 'light' && !unavail) {
-          /* Lights split: tap the body to toggle, the chevron to open
-             the light sheet. */
-          var split = el('div', 'light-card-split');
-          var lb = el('button', 'light-main-toggle'); lb.type = 'button';
-          var iw = el('div', 'light-main-icon-wrap');
-          iw.appendChild(ico);
-          lb.appendChild(iw);
-          lb.appendChild(info);
-          var rb = el('button', 'light-detail-open', '›'); rb.type = 'button';
-
-          lb.addEventListener('click', function (ev) {
-            ev.stopPropagation();
-            window._guardDeviceAction(entity.entity_id, function () {
-              window._xhr('POST', '/api/ha/service', {
-                domain: 'light',
-                service: on ? 'turn_off' : 'turn_on',
-                service_data: { entity_id: entity.entity_id }
-              }, function (err) {
-                if (err) return;
-                on = !on;
-                entity.state = on ? 'on' : 'off';
-                card.className = 'device-card' + (on ? ' on' : '');
-                stateEl.textContent = stateText(entity);
-              });
-            });
-          });
-
-          rb.addEventListener('click', function (ev) {
-            ev.stopPropagation();
-            if (window._openLightSheet) window._openLightSheet(entity);
-          });
-
-          split.appendChild(lb);
-          split.appendChild(rb);
-          card.appendChild(split);
-        } else {
-          card.appendChild(ico);
-          card.appendChild(info);
-          if (!unavail) {
-            card.addEventListener('click', function (ev) {
-              ev.stopPropagation();
-              var svc = on ? (domain === 'cover' ? 'close_cover' : 'turn_off')
-                           : (domain === 'cover' ? 'open_cover'  : 'turn_on');
-              window._guardDeviceAction(entity.entity_id, function () {
-                window._xhr('POST', '/api/ha/service', {
-                  domain: domain,
-                  service: svc,
-                  service_data: { entity_id: entity.entity_id }
-                }, function (err) {
-                  if (err) return;
-                  on = !on;
-                  entity.state = on ? 'on' : 'off';
-                  card.className = 'device-card' + (on ? ' on' : '');
-                  stateEl.textContent = stateText(entity);
-                });
-              });
-            });
-          }
-        }
-
-        grid.appendChild(card);
-      })(haWidgets[k]);
+      var w = haWidgets[k];
+      var entity = entityMap[w.id];
+      grid.appendChild(entity
+        ? window._haDeviceTile(entity)
+        : window._haGhostTile(w.id, w.label));
     }
   }
 
@@ -481,7 +415,17 @@
       ctx.card.setStatus(haSummaryText(ctx.entries, entities));
 
       ctx.card.addAction(ACTION_ICONS.power, 'Turn everything off', function () {
-        allOff(ctx.entries, entities);
+        /* Read the snapshot when the button is pressed, not when it was
+           bound. ctx.entities is whatever had arrived by render time, and on
+           a fresh launch that is an empty array: the card renders first and
+           the tiles are filled in afterwards by _homeSyncHAEntities. Closing
+           over it meant "Turn everything off" silently did nothing at all
+           until something re-rendered the Home tab.
+
+           The widget's set is the pinned entries only — the Smart Home tab
+           passes everything it shows to the same function. */
+        if (!window._haAllOff) return;
+        window._haAllOff(pinnedEntities(ctx.entries, liveEntities(entities)));
       });
 
       ctx.card.addAction(ACTION_ICONS.refresh, 'Refresh devices', function (btn) {
@@ -497,57 +441,6 @@
       }
     }
   });
-
-  /**
-   * Turn off every pinned device that is currently on.
-   *
-   * PIN-locked devices are handled separately and deliberately: rather
-   * than firing _guardDeviceAction per entity — which would stack one
-   * prompt per locked device — the locked ones are collected and gated
-   * behind a single prompt. The PIN is still required; only the number
-   * of prompts changes.
-   */
-  function allOff(haWidgets, entities) {
-    var map = {};
-    for (var i = 0; i < entities.length; i++) map[entities[i].entity_id] = entities[i];
-
-    var open = [], locked = [];
-    for (var k = 0; k < haWidgets.length; k++) {
-      var e = map[haWidgets[k].id];
-      if (!e || !isOn(e) || e.state === 'unavailable') continue;
-      if (window._isDeviceLocked && window._isDeviceLocked(e.entity_id)) locked.push(e);
-      else open.push(e);
-    }
-
-    if (!open.length && !locked.length) {
-      if (window._toast) window._toast('Everything is already off');
-      return;
-    }
-
-    function turnOff(list) {
-      for (var j = 0; j < list.length; j++) {
-        (function (entity) {
-          var domain = domainOf(entity.entity_id);
-          window._xhr('POST', '/api/ha/service', {
-            domain:  domain,
-            service: domain === 'cover' ? 'close_cover' : 'turn_off',
-            service_data: { entity_id: entity.entity_id }
-          }, function () {
-            if (window._refreshHADevices) window._refreshHADevices({ silent: true });
-          });
-        })(list[j]);
-      }
-    }
-
-    turnOff(open);
-
-    if (locked.length) {
-      window._openPinPrompt('devices', 'Locked devices',
-        'Enter the PIN to turn off ' + locked.length +
-        (locked.length === 1 ? ' locked device.' : ' locked devices.'),
-        function () { turnOff(locked); });
-    }
-  }
 
   /* ── Weather ─────────────────────────────────────────── */
   /* Short forms of the WMO code labels: the widget's condition line has

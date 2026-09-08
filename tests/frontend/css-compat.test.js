@@ -31,6 +31,13 @@ var CSS = CSS_FILES.map(function (f) {
   return stripComments(fs.readFileSync(path.join(CSS_DIR, f), 'utf8'));
 }).join('\n');
 
+/** Resolve a :root spacing token to its rem value. */
+function tokenRem(name) {
+  var m = CSS.match(new RegExp('--' + name + ':\\s*([\\d.]+)rem'));
+  expect(m).not.toBeNull();
+  return parseFloat(m[1]);
+}
+
 /* Report the offending line, not just "expected no match" — the whole
    point is to make the fix obvious. */
 function findLines(re) {
@@ -87,6 +94,27 @@ describe('the Home widget grid keeps its width/margin coupling', function () {
     }
   });
 
+  /* .device-card is the only one of these whose margin is a token rather
+     than a literal, so the coupling has to be checked against the resolved
+     value. Both scales are covered by the same rule: the page-level widths
+     on the Smart Home tab, and the narrower `.w-body .device-card` set used
+     inside a Home widget. This grid was resized from 4/5/6/8 columns to
+     2/3/4/5 with nothing asserting the relationship at the time. */
+  test('every .device-card width subtracts exactly 2x the card margin', function () {
+    var marginMatch = CSS.match(/\.device-card\s*\{[^}]*?margin:\s*var\(--([\w-]+)\)/);
+    expect(marginMatch).not.toBeNull();
+
+    var margin = tokenRem(marginMatch[1]);
+    var widths = CSS.match(/\.device-card[^{]*\{[^}]*?width:\s*calc\([^)]*\)/g) || [];
+    expect(widths.length).toBeGreaterThan(0);
+
+    for (var i = 0; i < widths.length; i++) {
+      var gutter = widths[i].match(/-\s*([\d.]+)rem\s*\)/);
+      expect(gutter).not.toBeNull();
+      expect(parseFloat(gutter[1])).toBeCloseTo(margin * 2, 5);
+    }
+  });
+
   test('.jelly-card width subtracts exactly 2x the card margin', function () {
     var marginMatch = CSS.match(/\.jelly-card\s*\{[^}]*?margin:\s*([\d.]+)rem/);
     expect(marginMatch).not.toBeNull();
@@ -109,12 +137,6 @@ describe('single-margin wrapping rows keep their half-margin width coupling', fu
      every card carries the full margin — the width must subtract half of
      it, not the whole thing. .wx-day fell out of sync with this exact
      relationship before (0.25rem subtracted instead of 0.125rem). */
-  function tokenRem(name) {
-    var m = CSS.match(new RegExp('--' + name + ':\\s*([\\d.]+)rem'));
-    expect(m).not.toBeNull();
-    return parseFloat(m[1]);
-  }
-
   test('.wx-day two-column width is half of --space-2xs less than 50%', function () {
     var margin = tokenRem('space-2xs');
     var widths = CSS.match(/\.wx-day\s*\{[^}]*?width:\s*calc\([^)]*\)/g) || [];

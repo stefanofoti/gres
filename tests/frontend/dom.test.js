@@ -26,6 +26,45 @@ function flush() {
   return Promise.resolve();
 }
 
+/*
+ * jsdom reuses one document/window across every loadApp() in this file, so
+ * the listeners each previous load registered on them survive into the next
+ * one — and they are not inert: those handlers resolve their elements by id
+ * at call time, so a handler belonging to a discarded app instance happily
+ * drives the current DOM. That is invisible for most tests (both instances
+ * do the same thing) but fatal for the wake-from-standby ones below, which
+ * dispatch an event precisely to assert that a build does *not* react to it.
+ * Record what each load registers and tear it down before the next.
+ */
+var _appListeners = [];
+function trackListenersDuring(load) {
+  for (var i = 0; i < _appListeners.length; i++) {
+    var l = _appListeners[i];
+    l.target.removeEventListener(l.type, l.fn, l.opts);
+  }
+  _appListeners = [];
+
+  var targets = [document, window];
+  var originals = [];
+  for (var t = 0; t < targets.length; t++) {
+    (function (target) {
+      var original = target.addEventListener;
+      originals.push({ target: target, fn: original });
+      target.addEventListener = function (type, fn, opts) {
+        _appListeners.push({ target: target, type: type, fn: fn, opts: opts });
+        return original.call(target, type, fn, opts);
+      };
+    })(targets[t]);
+  }
+  try {
+    load();
+  } finally {
+    for (var o = 0; o < originals.length; o++) {
+      originals[o].target.addEventListener = originals[o].fn;
+    }
+  }
+}
+
 function loadApp(routeHandler) {
   document.documentElement.className = '';
   document.body.innerHTML = BODY_HTML;
@@ -52,8 +91,10 @@ function loadApp(routeHandler) {
   jest.resetModules();
   /* Same order as index.html: widgets.js defines window._WIDGETS and must
      be evaluated before app.js's HOME module reads the registry. */
-  require(WIDGETS_JS_PATH);
-  require(APP_JS_PATH);
+  trackListenersDuring(function () {
+    require(WIDGETS_JS_PATH);
+    require(APP_JS_PATH);
+  });
 }
 
 beforeEach(function () { jest.useFakeTimers(); });
@@ -1068,6 +1109,373 @@ describe('update check (Software block)', function () {
       return flush();
     }).then(function () {
       expect(document.getElementById('sw-status').textContent).toBe('Version 0.0.13 available');
+    });
+  });
+});
+
+/*
+ * The wall panel is an iPad on iOS 9.3, where Safari exposes the Page
+ * Visibility API only as document.webkitHidden / 'webkitvisibilitychange'
+ * — the unprefixed names arrive in iOS 10.3. jsdom implements the modern
+ * spelling, so a test that only dispatches 'visibilitychange' passes while
+ * the device does nothing at all (the wake overlay never appeared there).
+ * simulateIOS93 removes the unprefixed property and installs the prefixed
+ * one, so the resolution in app.js is exercised against the real target.
+ */
+function simulateIOS93(hidden) {
+  Object.defineProperty(document, 'hidden', { value: undefined, configurable: true });
+  Object.defineProperty(document, 'webkitHidden', { value: !!hidden, configurable: true });
+}
+function setIOS93Hidden(hidden) {
+  Object.defineProperty(document, 'webkitHidden', { value: !!hidden, configurable: true });
+}
+function restoreVisibilityAPI() {
+  delete document.hidden;
+  delete document.webkitHidden;
+}
+
+describe('wake from standby', function () {
+  afterEach(restoreVisibilityAPI);
+
+  function overlayHidden() {
+    return document.getElementById('wake-overlay').classList.contains('hidden');
+  }
+
+  test('the overlay stays down on a normal page load', function () {
+    loadApp();
+    return flush().then(function () {
+      expect(overlayHidden()).toBe(true);
+    });
+  });
+
+  test('shows the overlay on iOS 9.3, which only has the webkit-prefixed API', function () {
+    simulateIOS93(true);
+    loadApp();
+    return flush().then(function () {
+      expect(overlayHidden()).toBe(true);
+      setIOS93Hidden(false);
+      document.dispatchEvent(new Event('webkitvisibilitychange'));
+      /* Shown synchronously by onAppWake; the 350ms floor keeps it up
+         across this first flush so it can't flash. */
+      expect(overlayHidden()).toBe(false);
+      return flush();
+    }).then(function () {
+      expect(overlayHidden()).toBe(false);
+      jest.advanceTimersByTime(500);
+      expect(overlayHidden()).toBe(true);
+    });
+  });
+
+  test('reads the prefixed hidden flag on iOS 9.3 instead of undefined', function () {
+    simulateIOS93(true);
+    loadApp();
+    return flush().then(function () {
+      expect(window._appHidden()).toBe(true);
+      setIOS93Hidden(false);
+      expect(window._appHidden()).toBe(false);
+    });
+  });
+
+  test('ignores the unprefixed event on iOS 9.3, which never fires there', function () {
+    simulateIOS93(false);
+    loadApp();
+    return flush().then(function () {
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(overlayHidden()).toBe(true);
+    });
+  });
+
+  test('still shows the overlay on a browser with the unprefixed API', function () {
+    loadApp();
+    return flush().then(function () {
+      document.dispatchEvent(new Event('visibilitychange'));
+      expect(overlayHidden()).toBe(false);
+      jest.advanceTimersByTime(600);
+      expect(overlayHidden()).toBe(true);
+    });
+  });
+
+  test('window focus is a second wake signal, but not during the first seconds', function () {
+    simulateIOS93(false);
+    loadApp();
+    return flush().then(function () {
+      /* A focus right after launch is the browser handing the fresh
+         document focus, not a wake. */
+      window.dispatchEvent(new Event('focus'));
+      expect(overlayHidden()).toBe(true);
+      jest.advanceTimersByTime(4000);
+      window.dispatchEvent(new Event('focus'));
+      expect(overlayHidden()).toBe(false);
+    });
+  });
+});
+
+/*
+ * The Smart Home tab and the Home screen's Smart Home widget render the same
+ * device tiles. They used to do it from two near-copies of the same code,
+ * kept in step by hand through window._haStateText / _haIcons /
+ * _haFriendlyName — and they had already drifted: only the tab's tiles
+ * carried the in-flight toggle guard, the busy state, the rollback on a
+ * failed call and the colour tint. These tests exist to keep the second
+ * renderer from growing back.
+ */
+describe('device tiles (one renderer for the tab and the widget)', function () {
+  var LIGHT = {
+    entity_id: 'light.kitchen', state: 'off',
+    attributes: { friendly_name: 'Kitchen', supported_color_modes: ['color_temp'] }
+  };
+  var SWITCH = {
+    entity_id: 'switch.lamp', state: 'on',
+    attributes: { friendly_name: 'Lamp' }
+  };
+
+  function routes(widgets, entities, posts) {
+    return function (method, url, body) {
+      if (method === 'POST' && url.indexOf('/api/ha/service') !== -1) {
+        if (posts) posts.push(JSON.parse(body));
+        return { status: 200, body: { ok: true } };
+      }
+      if (url.indexOf('/api/settings') !== -1 && method === 'GET') {
+        return { status: 200, body: { home_widgets: widgets } };
+      }
+      if (url.indexOf('/api/ha/devices') !== -1) {
+        return { status: 200, body: {
+          entities: entities,
+          summary: { total: entities.length, active: 0 }
+        } };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url, body);
+    };
+  }
+
+  /* What the tile is built out of, ignoring text and the inline colour tint:
+     tag + classes, nested. Two places producing one signature is the whole
+     point of the merge. Note the OUTER class carries little weight here —
+     syncCardFromEntity re-derives it from scratch on every poll, so it is
+     normalised away — the discriminating part is the nested structure. */
+  function signature(el) {
+    var out = el.tagName.toLowerCase() + '.' + el.className;
+    for (var i = 0; i < el.children.length; i++) {
+      out += '(' + signature(el.children[i]) + ')';
+    }
+    return out;
+  }
+
+  function tile(scope, eid) {
+    return document.querySelector(scope + ' .device-card[data-eid="' + eid + '"]');
+  }
+
+  test('the widget and the tab build the same tile for the same entity', function () {
+    loadApp(routes([
+      { type: 'smarthome', id: LIGHT.entity_id,  label: 'Kitchen' },
+      { type: 'smarthome', id: SWITCH.entity_id, label: 'Lamp' }
+    ], [LIGHT, SWITCH]));
+
+    return flush().then(function () {
+      document.querySelector('[data-page="smarthome"]').click();
+      return flush();
+    }).then(function () {
+      [LIGHT, SWITCH].forEach(function (entity) {
+        var inWidget = tile('#home-widgets', entity.entity_id);
+        var inTab    = tile('#smarthome-content', entity.entity_id);
+        expect(inWidget).not.toBeNull();
+        expect(inTab).not.toBeNull();
+        expect(signature(inWidget)).toBe(signature(inTab));
+      });
+    });
+  });
+
+  test('a light tile splits into a toggle and a labelled way into the sheet', function () {
+    loadApp(routes([{ type: 'smarthome', id: LIGHT.entity_id, label: 'Kitchen' }], [LIGHT]));
+    return flush().then(function () {
+      var t = tile('#home-widgets', LIGHT.entity_id);
+      /* Structural, and load-bearing: it is what takes the card's own
+         padding off so the two inner buttons can carry it instead. */
+      expect(t.className).toContain('device-card--split');
+      var detail = t.querySelector('.light-detail-open');
+      expect(detail.getAttribute('aria-label')).toBe('Light settings');
+      expect(detail.querySelector('svg')).not.toBeNull();
+    });
+  });
+
+  test('a pinned entity HA does not report keeps its slot', function () {
+    loadApp(routes([{ type: 'smarthome', id: 'light.hallway', label: 'Hallway' }], [SWITCH]));
+    return flush().then(function () {
+      var ghost = document.querySelector('#home-widgets .device-card.unavail');
+      expect(ghost).not.toBeNull();
+      expect(ghost.querySelector('.card-name').textContent).toBe('Hallway');
+      /* The id alone picks the icon, so the slot keeps the device's
+         identity instead of collapsing to a generic mark. */
+      expect(ghost.querySelector('.card-icon svg')).not.toBeNull();
+    });
+  });
+
+  /* ── assistive tech ──────────────────────────────────
+     A plain tile is a div, so the button role, the focus stop and the
+     keyboard all have to be given to it by hand — and role="button"
+     without the keyboard is worse than no ARIA at all. */
+
+  test('a plain tile is a button to assistive tech, and reflects its state', function () {
+    loadApp(routes([{ type: 'smarthome', id: SWITCH.entity_id, label: 'Lamp' }], [SWITCH]));
+    return flush().then(function () {
+      var t = tile('#home-widgets', SWITCH.entity_id);
+      expect(t.getAttribute('role')).toBe('button');
+      expect(t.getAttribute('tabindex')).toBe('0');
+      expect(t.getAttribute('aria-pressed')).toBe('true');
+      t.click();
+      expect(t.getAttribute('aria-pressed')).toBe('false');
+    });
+  });
+
+  test('a light tile carries the pressed state on its toggle, not the card', function () {
+    loadApp(routes([{ type: 'smarthome', id: LIGHT.entity_id, label: 'Kitchen' }], [LIGHT]));
+    return flush().then(function () {
+      var t = tile('#home-widgets', LIGHT.entity_id);
+      /* The card hosts two real buttons and a button may not contain
+         buttons, so the card itself must not claim the role. */
+      expect(t.getAttribute('role')).toBeNull();
+      expect(t.getAttribute('aria-pressed')).toBeNull();
+      expect(t.querySelector('.light-main-toggle').getAttribute('aria-pressed')).toBe('false');
+    });
+  });
+
+  test('Enter activates a tile that only looks like a button', function () {
+    var posts = [];
+    loadApp(routes([{ type: 'smarthome', id: SWITCH.entity_id, label: 'Lamp' }], [SWITCH], posts));
+    return flush().then(function () {
+      var t = tile('#home-widgets', SWITCH.entity_id);
+      var ev = new window.KeyboardEvent('keydown', { bubbles: true });
+      /* jsdom does not fill keyCode in from the init dict, and keyCode is
+         what the handler reads — e.key is only partly there on iOS 9.3. */
+      Object.defineProperty(ev, 'keyCode', { get: function () { return 13; } });
+      t.dispatchEvent(ev);
+      return flush();
+    }).then(function () {
+      expect(posts.length).toBe(1);
+      expect(posts[0].service).toBe('turn_off');
+    });
+  });
+
+  test('the tab switches off everything it shows, one call per service', function () {
+    var posts = [];
+    var live = [
+      { entity_id: 'switch.a', state: 'on',   attributes: { friendly_name: 'A' } },
+      { entity_id: 'switch.b', state: 'off',  attributes: { friendly_name: 'B' } },
+      { entity_id: 'cover.c',  state: 'open', attributes: { friendly_name: 'C' } }
+    ];
+    loadApp(routes([], live, posts));
+
+    return flush().then(function () {
+      document.querySelector('[data-page="smarthome"]').click();
+      return flush();
+    }).then(function () {
+      document.getElementById('smarthome-alloff-btn').click();
+      return flush();
+    }).then(function () {
+      /* switch.b is already off and must be left alone; a cover closes
+         rather than turning off, so it cannot share the switches' call. */
+      expect(posts.length).toBe(2);
+      var ids = {};
+      posts.forEach(function (p) { ids[p.domain + '.' + p.service] = p.service_data.entity_id; });
+      expect(ids['switch.turn_off']).toEqual(['switch.a']);
+      expect(ids['cover.close_cover']).toEqual(['cover.c']);
+    });
+  });
+
+  /* ── responsiveness ──────────────────────────────────
+     A tap used to cost a flat 500ms of dimmed, unresponsive tile on top of
+     the round trip, and the 15-second poll used to rewrite every tile
+     whether or not anything had moved. Both are invisible to a screenshot,
+     so they are pinned here. */
+
+  test('a tap is not locked out for 500ms by the one before it', function () {
+    var posts = [];
+    loadApp(routes(
+      [{ type: 'smarthome', id: SWITCH.entity_id, label: 'Lamp' }], [SWITCH], posts));
+
+    return flush().then(function () {
+      var t = tile('#home-widgets', SWITCH.entity_id);
+      t.click();
+      /* .busy is for a call that is actually slow. Applied on every tap it
+         was a flicker on a healthy LAN and a 500ms dead tile on a bad one. */
+      expect(t.classList.contains('busy')).toBe(false);
+      return flush();
+    }).then(function () {
+      expect(posts.length).toBe(1);
+      /* The old build deleted state.toggling 500ms AFTER the response, so
+         a second tap this soon was swallowed with no feedback at all. */
+      tile('#home-widgets', SWITCH.entity_id).click();
+      return flush();
+    }).then(function () {
+      expect(posts.length).toBe(2);
+      expect(posts[0].service).toBe('turn_off');
+      expect(posts[1].service).toBe('turn_on');
+    });
+  });
+
+  test('a poll that brings no news leaves the tile alone', function () {
+    loadApp(routes([{ type: 'smarthome', id: SWITCH.entity_id, label: 'Lamp' }], [SWITCH]));
+    return flush().then(function () {
+      var t = tile('#home-widgets', SWITCH.entity_id);
+      /* Mark the tile in both places a sync would overwrite. */
+      t.className += ' sentinel';
+      t.querySelector('.card-state').textContent = 'SENTINEL';
+      window._refreshHADevices({ silent: true });
+      return flush();
+    }).then(function () {
+      var t = tile('#home-widgets', SWITCH.entity_id);
+      expect(t.className).toContain('sentinel');
+      expect(t.querySelector('.card-state').textContent).toBe('SENTINEL');
+    });
+  });
+
+  test('a poll that brings a change still rewrites the tile', function () {
+    var live = [{ entity_id: 'switch.lamp', state: 'on', attributes: { friendly_name: 'Lamp' } }];
+    loadApp(routes([{ type: 'smarthome', id: 'switch.lamp', label: 'Lamp' }], live));
+    return flush().then(function () {
+      tile('#home-widgets', 'switch.lamp').className += ' sentinel';
+      live[0].state = 'off';
+      window._refreshHADevices({ silent: true });
+      return flush();
+    }).then(function () {
+      var t = tile('#home-widgets', 'switch.lamp');
+      expect(t.className).not.toContain('sentinel');
+      expect(t.querySelector('.card-state').textContent).toBe('off');
+    });
+  });
+
+  test('turning everything off sends one call per service, not per device', function () {
+    var posts = [];
+    var live = [
+      { entity_id: 'switch.a', state: 'on', attributes: { friendly_name: 'A' } },
+      { entity_id: 'switch.b', state: 'on', attributes: { friendly_name: 'B' } },
+      { entity_id: 'light.c',  state: 'on',
+        attributes: { friendly_name: 'C', supported_color_modes: ['brightness'] } }
+    ];
+    var widgets = live.map(function (e) {
+      return { type: 'smarthome', id: e.entity_id, label: e.attributes.friendly_name };
+    });
+
+    loadApp(routes(widgets, live, posts));
+    return flush().then(function () {
+      /* The widget's first header action is "Turn everything off". */
+      document.querySelector('#home-widgets [data-ha-card] .w-head-btn').click();
+      return flush();
+    }).then(function () {
+      expect(posts.length).toBe(2);
+      var ids = {};
+      posts.forEach(function (p) { ids[p.domain] = p.service_data.entity_id; });
+      expect(ids.switch).toEqual(['switch.a', 'switch.b']);
+      expect(ids.light).toEqual(['light.c']);
+    });
+  });
+
+  test('a pinned entry with no id renders instead of throwing', function () {
+    loadApp(routes([{ type: 'smarthome', label: 'Broken entry' }], [SWITCH]));
+    return flush().then(function () {
+      var ghost = document.querySelector('#home-widgets .device-card.unavail');
+      expect(ghost).not.toBeNull();
+      expect(ghost.querySelector('.card-name').textContent).toBe('Broken entry');
     });
   });
 });

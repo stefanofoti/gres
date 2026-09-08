@@ -187,9 +187,9 @@ html, body {
 
 /* ── Section label ──────────────────────────────────── */
 .section-label {
-  font-size: var(--text-2xs); font-weight: 500; letter-spacing: 0.12em;
+  font-size: var(--text-xs); font-weight: 500; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--text-muted-warm);
-  padding: 1.375rem var(--space-xl) var(--space-md);
+  padding: var(--space-base) var(--space-xl) var(--space-md);
 }
 
 /* ── Device grid — 2 col boxes ──────────────────────── */
@@ -202,9 +202,9 @@ html, body {
 .device-card {
   /* 0.5rem == 2x the margin below. Literal, not var(): var() inside
      calc() is unreliable on iOS 9.3 WebKit. Keep the two in sync. */
-  width: calc(25% - 0.5rem);
+  width: calc(50% - 0.5rem);
   margin: var(--space-2xs);
-  min-height: 110px;
+  min-height: 132px;
   border-radius: var(--radius-xl);
   padding: var(--space-xl) var(--space-lg) var(--space-lg);
   cursor: pointer;
@@ -217,33 +217,55 @@ html, body {
   -webkit-transition: background 0.2s, border-color 0.2s, opacity 0.12s;
   transition: background 0.2s, border-color 0.2s, opacity 0.12s;
 }
-@media (min-width: 600px) { .device-card { width: calc(20% - 0.5rem); } }
-@media (min-width: 900px) { .device-card { width: calc(16.6667% - 0.5rem); } }
-/* the 1200px container would stretch 6 columns to ~200px, far wider than the
-   card is tall — step up to 8 so the cards keep their proportions */
-@media (min-width: 1200px) { .device-card { width: calc(12.5% - 0.5rem); } }
+/* Column counts are set for a wall-mounted panel read at arm's length, not
+   a phone held in the hand: the tile grows with the viewport instead of the
+   grid just getting denser. At 1024px — the primary iPad target — four
+   columns give a ~240px tile where the old six-column scale gave ~158px. */
+@media (min-width: 600px)  { .device-card { width: calc(33.3333% - 0.5rem); } }
+@media (min-width: 900px)  { .device-card { width: calc(25% - 0.5rem); } }
+@media (min-width: 1200px) { .device-card { width: calc(20% - 0.5rem); } }
 .device-card:active { opacity: 0.7; }
 .device-card.on {
   background: var(--text-primary-soft);
   border-color: var(--border-light);
 }
-.device-card.unavail { opacity: 0.22; cursor: default; }
+/* An offline device stays legible and labelled instead of fading to a ghost:
+   at 0.22 it read as a rendering artefact rather than as "this is offline",
+   and in a real house several entities are unavailable at any time. The
+   dashed border carries the state so it does not rest on opacity alone. */
+.device-card.unavail {
+  opacity: 0.6; cursor: default;
+  border-style: dashed;
+}
 .device-card.busy    { opacity: 0.55; }
 
-/* icon — top left */
+/* icon — top left.
+   A drawn SVG in a round chip, not a typographic glyph. The old map was
+   ○ ⌁ ▷ ◇ ◎ ▭ at 22px, and ⌁ (U+2301) is not in the iOS 9.3 system fonts,
+   so switches and input_booleans fell back to a hairline symbol face or to
+   tofu — and none of them had the mass to read from across a room. The chip
+   gives the icon a footprint the tile can be recognised by at a glance.
+   Sized in rem, so the text-size lever still scales it. */
 .card-icon {
-  font-size: var(--text-2xl);
-  color: #767680;
-  line-height: 1;
-  -webkit-transition: color 0.2s; transition: color 0.2s;
+  width: 2.75rem; height: 2.75rem;        /* 44px @ root 16 */
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text-muted-light);
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  -webkit-transition: background 0.2s, color 0.2s;
+  transition: background 0.2s, color 0.2s;
 }
-.device-card.on .card-icon { color: #4a4a9a; }
+.card-icon > svg { display: block; width: 1.5rem; height: 1.5rem; }
+.device-card.on .card-icon { background: rgba(74,74,154,0.16); color: #4a4a9a; }
 
 /* name + state — bottom */
 .card-info { min-width: 0; }
 
 .card-name {
-  font-size: var(--text-base); font-weight: 500;
+  font-size: var(--text-lg); font-weight: 500;
   color: #c2c2ca;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   line-height: 1.3;
@@ -252,7 +274,7 @@ html, body {
 .device-card.on .card-name { color: var(--surface-raised); }
 
 .card-state {
-  font-size: var(--text-xs); color: var(--text-muted);
+  font-size: var(--text-sm); color: var(--text-muted);
   margin-top: var(--space-3xs);
   -webkit-transition: color 0.2s; transition: color 0.2s;
 }
@@ -1022,6 +1044,16 @@ html, body {
 }
 .feat-widget-item-left > * + * { margin-left: var(--space-sm); }
 .feat-widget-item-icon { font-size: var(--text-sm); color: var(--text-faint-warm); width: 14px; text-align: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
+/* Same slot, drawn instead of typed. Only the smart-device-protection list
+   uses it; the widget-picker rows above still carry their own glyphs, so the
+   base rule keeps its font-size. Same specificity — this must stay after. */
+.feat-widget-item-icon--svg {
+  width: 1.125rem; height: 1.125rem;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+}
+.feat-widget-item-icon--svg > svg { display: block; width: 1.125rem; height: 1.125rem; }
 .feat-widget-item-name {
   font-size: var(--text-sm); color: var(--text-muted-light);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1651,12 +1683,28 @@ html, body {
 @media (min-width: 600px) { #light-sheet { max-width: 480px; margin: 0 auto; } }
 #light-sheet::-webkit-scrollbar { display: none; }
 
-/* drag handle */
+/* drag handle. The strip around it is the target — 4px is a decoration,
+   not something a thumb can pull, and this one now actually dismisses. */
+.sheet-grip {
+  height: 1.75rem;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  /* Safari 9 has no unprefixed grab cursor and would drop the declaration.
+     Cosmetic on a touch panel, but the desktop path is the dev path. */
+  cursor: -webkit-grab; cursor: grab;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
 .sheet-handle {
   width: 36px; height: 4px;
   background: rgba(255,255,255,0.1);
   border-radius: 0.125rem;
-  margin: var(--space-base) auto 0;
+}
+/* 1:1 with the finger while dragging; the transition comes back for the
+   spring-back and for the dismiss, both of which are animations. */
+#light-sheet.is-dragging {
+  -webkit-transition: none; transition: none;
 }
 
 /* sheet header */
@@ -1720,6 +1768,9 @@ html, body {
   padding: var(--space-xl) var(--space-3xl) var(--space-base);
   border-bottom: 1px solid var(--border);
 }
+.sheet-control:last-child { border-bottom: none; }
+/* The mode switch is a divider between two sections, not a section. */
+#ctrl-mode { padding-bottom: var(--space-xl); }
 .sheet-control-header {
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
@@ -1735,39 +1786,150 @@ html, body {
   font-size: var(--text-sm); color: var(--text-primary);
 }
 
-/* custom range slider */
-.sheet-slider {
+/* ── drag bars ───────────────────────────────────────
+   These replace two <input type=range>. The range's box was 4px tall and
+   the 24px thumb was painted OUTSIDE it on a negative margin, so the only
+   reliably grabbable region was one small circle on a ~950px bar and the
+   rest was a 4px strip — about 0.4mm on the panel. Missing it was not
+   harmless either: the sheet is overflow-y:auto, so a missed touch became
+   a scroll and the sheet moved instead of the value.
+   Here the whole 3.5rem surface is the target, there is no thumb to hit,
+   and the JS cancels the touch so the sheet cannot scroll under a drag. */
+.fill-bar {
+  position: relative;
+  height: 3.5rem;                     /* 56px @ root 16 */
+  border-radius: var(--radius-lg);
+  background: var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.fill-bar-fill {
+  position: absolute; top: 0; left: 0; bottom: 0;
+  width: 0;
+  background: var(--accent-deep);
+  -webkit-transition: width 0.12s linear; transition: width 0.12s linear;
+}
+/* Following a finger must not also be animating towards it. */
+.fill-bar.is-dragging .fill-bar-fill {
+  -webkit-transition: none; transition: none;
+}
+/* Colour temperature is a position, not an amount, so it gets a marker on
+   a gradient rather than a fill. Warm sits at the LEFT because the axis is
+   Kelvin ascending: the old control ran on mireds, which increase as the
+   light gets warmer, so the slider travelled backwards against its own
+   cool-to-warm gradient. */
+.fill-bar--ct {
+  background: linear-gradient(90deg, #f0d0a1, #ffffff 55%, #b5cad7);
+  /* Only the knob overhangs, and it must: clipped to the box it loses half
+     its width at each end of the travel, which is exactly where a light's
+     warmest and coolest settings sit. The gradient still gets the rounded
+     corners — that is the element's own background, not a child. */
+  overflow: visible;
+}
+.fill-bar-knob {
+  position: absolute; top: 0; bottom: 0; left: 0;
+  width: 0.375rem;
+  margin-left: -0.1875rem;
+  border-radius: 0.1875rem;
+  background: var(--white);
+  -webkit-box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.35);
+}
+.fill-bar.is-dragging .fill-bar-knob {
+  -webkit-transition: none; transition: none;
+}
+
+/* ── preset chips ────────────────────────────────────
+   The values people actually pick, one tap away, so the common case never
+   needs a drag at all. Wrapping row: uniform margins, not `> * + *`. */
+.sheet-chips {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-wrap: wrap; flex-wrap: wrap;
+  margin-top: var(--space-md);
+}
+.sheet-chip {
   -webkit-appearance: none; appearance: none;
-  width: 100%; height: 4px;
-  border-radius: 0.125rem;
-  outline: none; border: none;
+  /* Safari 9 applies its own button metrics — see the forecast rows. */
+  font: inherit; font-size: var(--text-sm);
+  min-width: 3.75rem; height: 2.75rem;      /* 44px */
+  padding: 0 var(--space-base);
+  margin: 0 var(--space-sm) var(--space-sm) 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
   cursor: pointer;
-  background: var(--border-strong);
 }
-.sheet-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 24px; height: 24px; border-radius: 50%;
-  background: var(--white); border: none;
-  -webkit-box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+.sheet-chip:active { opacity: 0.65; }
+.sheet-chip.is-on {
+  background: var(--accent-bg);
+  border-color: var(--accent-dim);
+  color: var(--accent-bright);
+}
+
+/* ── white / colour switch ───────────────────────────── */
+.seg {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+}
+.seg-btn {
+  -webkit-appearance: none; appearance: none;
+  font: inherit; font-size: var(--text-sm);
+  /* Explicit width as well as flex: Safari 9 is unreliable about flexing
+     a <button>, and there are always exactly two. */
+  width: 50%;
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  height: 2.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted-soft);
   cursor: pointer;
-  margin-top: -0.625rem;
 }
-/* brightness track tint via gradient — set inline by JS */
-.slider-brightness { background: linear-gradient(90deg, var(--border-strong), var(--text-accent-soft)); }
-.slider-colortemp  { background: linear-gradient(90deg, #b5cad7, #f0d0a1); }
+.seg-btn.is-on { background: var(--accent-bg); color: var(--text-primary-soft); }
+
+/* ── colour swatches ─────────────────────────────────── */
+.sheet-swatches {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-flex-wrap: wrap; flex-wrap: wrap;
+  margin-top: var(--space-sm);
+}
+.sheet-swatch {
+  -webkit-appearance: none; appearance: none;
+  width: 3.25rem; height: 3.25rem;          /* 52px */
+  margin: 0 var(--space-sm) var(--space-sm) 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.sheet-swatch:active { opacity: 0.7; }
+.sheet-swatch.is-on { border-color: var(--white); }
+
+/* Precision picking, folded away until asked for. Keeping the wheel out of
+   the open path also keeps its 57,600-pixel raster off the slide-up. */
+.sheet-more {
+  -webkit-appearance: none; appearance: none;
+  font: inherit; font-size: var(--text-sm);
+  display: block; width: 100%; height: 2.75rem;
+  margin-top: var(--space-2xs);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted-soft);
+  cursor: pointer;
+}
+.sheet-more:active { opacity: 0.65; }
 
 /* color wheel */
 .sheet-colorwheel-wrap {
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  padding: var(--space-xl) var(--space-3xl) var(--space-3xl);
-}
-.sheet-colorwheel-header {
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  width: 100%; margin-bottom: var(--space-xl);
+  padding: var(--space-base) 0 var(--space-sm);
 }
 #light-color-canvas {
   border-radius: 50%;
@@ -1800,12 +1962,19 @@ html, body {
 .device-card.on .card-more { color: var(--text-faint-soft); }
 
 /* light card split layout */
+/* A light tile carries its padding on the two buttons inside it, so the
+   whole surface stays tappable out to the edge. The card's own padding has
+   to come off, or the two stack: light tiles rendered ~30px taller and
+   visibly more inset than the switch tiles beside them, and the name lost
+   enough width to ellipsise ("Luce C...") where a switch showed it whole.
+   Applied via a class because CSS has no parent selector on this engine. */
+.device-card--split { padding: 0; }
 .light-card-split {
   width: 100%;
   height: 100%;
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
-  min-height: 110px;
+  min-height: 132px;
 }
 .light-main-toggle,
 .light-detail-open {
@@ -1827,21 +1996,22 @@ html, body {
   padding: var(--space-xl) var(--space-base) var(--space-lg) var(--space-lg);
   cursor: pointer;
 }
-.light-main-toggle:disabled,
-.light-detail-open:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
 .light-main-icon-wrap {
   display: block;
 }
+/* 2.75rem == 44px @ root 16, the HIG minimum touch target. This is the ONLY
+   way into brightness and colour, and at 42px it was both under the minimum
+   and the least salient thing on the tile. */
 .light-detail-open {
-  width: 42px;
+  width: 2.75rem;
   border-left: 1px solid rgba(255,255,255,0.12);
-  font-size: var(--text-xl);
   color: var(--text-muted-light);
   cursor: pointer;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
 }
+.light-detail-open > svg { display: block; width: 1.25rem; height: 1.25rem; }
 .device-card.on .light-detail-open {
   border-left-color: rgba(0,0,0,0.12);
   color: var(--text-faint-soft);
@@ -2020,8 +2190,11 @@ html, body {
   -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
   background: -webkit-linear-gradient(135deg, var(--border), var(--surface));
   background: linear-gradient(135deg, var(--border), var(--surface));
-  font-size: var(--text-3xl); color: var(--text-faint-light);
+  color: var(--text-faint-light);
 }
+/* Drawn, so sized rather than set in a font size — in rem, so the
+   text-size lever still reaches it. */
+.jelly-card-poster-placeholder > svg { width: 2rem; height: 2rem; }
 
 .jelly-card-rating {
   position: absolute;
@@ -2381,6 +2554,15 @@ html, body {
   cursor: pointer; border: none;
   -webkit-transition: opacity 0.15s; transition: opacity 0.15s;
 }
+/* Icon then label on one line. These buttons are inline-level and take
+   their width from their text, so the icon is inline too rather than the
+   button becoming a flex container. */
+.px-action-btn > svg {
+  display: inline-block;
+  width: 0.875rem; height: 0.875rem;
+  vertical-align: -0.125rem;
+  margin-right: var(--space-2xs);
+}
 .px-action-btn:active { opacity: 0.6; }
 .px-action-btn.start    { background: rgba(61,220,132,0.12); color: var(--ok); border: 1px solid rgba(61,220,132,0.2); }
 .px-action-btn.stop     { background: rgba(255,95,87,0.10);  color: var(--err); border: 1px solid rgba(255,95,87,0.2); }
@@ -2691,10 +2873,15 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
   display: -webkit-flex; display: -webkit-box; display: flex;
   -webkit-box-pack: end; -webkit-justify-content: flex-end; justify-content: flex-end;
 }
+/* Single-line row, so the sibling idiom is the right one here — uniform
+   margins are for grids that wrap. */
+.smarthome-top-actions > * + * { margin-left: var(--space-sm); }
 .smarthome-top-actions .btn-icon-only {
-  width: 32px; height: 32px; min-width: 32px; padding: 0;
+  /* 2.75rem == 44px @ root 16, the HIG minimum. This is the tab's only
+     control and it sat at 32px. */
+  width: 2.75rem; height: 2.75rem; min-width: 2.75rem; padding: 0;
   border-radius: var(--radius-sm); border: 1px solid var(--border-accent);
-  background: var(--surface-raised); color: var(--text-muted-accent); font-size: var(--text-xl); line-height: 1;
+  background: var(--surface-raised); color: var(--text-muted-accent); line-height: 1;
   cursor: pointer; -webkit-tap-highlight-color: transparent;
   /* Centres the glyph on its own. This used to depend on a global
      `line-height: 32px` that lived in the Weather section; the weather
@@ -2706,6 +2893,7 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
 }
 .smarthome-top-actions .btn-icon-only:active { opacity: 0.65; }
 .smarthome-top-actions .btn-icon-only.is-busy { opacity: 0.45; pointer-events: none; }
+.smarthome-top-actions .btn-icon-only > svg { display: block; width: 1.25rem; height: 1.25rem; }
 
 /* ── Device tiles nested inside a widget ────────────
    On the Smart Home tab .device-card is sized against the full page,
@@ -2719,11 +2907,28 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
 .w-body .devices-grid { padding: 0 var(--space-sm); }
 .w-body .device-card {
   width: calc(50% - 0.5rem);
-  min-height: 92px;
+  min-height: 104px;
   padding: var(--space-base) var(--space-md) var(--space-md);
 }
+/* Three columns is the last step: a fourth put the tile back under 150px,
+   where a light's 44px chevron leaves ~100px of name and "Luce Cucina"
+   ellipsises again — the same failure this pass removed from the tab. The
+   Smart Home card is wide and has the vertical room for a second row. */
 @media (min-width: 600px)  { .w-body .device-card { width: calc(33.3333% - 0.5rem); } }
-@media (min-width: 1024px) { .w-body .device-card { width: calc(25% - 0.5rem); } }
+
+/* The tab's scale is set for a wall panel; inside a widget the same tile is
+   a quarter of a two-thirds card, so icon and type step back down. (0,2,0)
+   and (0,3,0) beat the page-level rules regardless of source order — and
+   the light tile's split has to be pinned to the same floor as the card,
+   or lights render taller than switches inside the widget too. */
+.w-body .card-name  { font-size: var(--text-md); }
+.w-body .card-state { font-size: var(--text-xs); }
+.w-body .light-card-split { min-height: 104px; }
+.w-body .light-main-toggle {
+  padding: var(--space-base) var(--space-sm) var(--space-md) var(--space-md);
+}
+.w-body .device-card .card-icon { width: 2.25rem; height: 2.25rem; }
+.w-body .device-card .card-icon > svg { width: 1.25rem; height: 1.25rem; }
 
 /* ── Short-viewport budget ───────────────────────────
    Phone landscape leaves ~300px of content height — barely more than one
@@ -2748,7 +2953,8 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
     min-height: 0;
     padding: var(--space-sm) var(--space-md);
   }
-  .w-body .device-card .card-icon { font-size: var(--text-lg); }
+  .w-body .device-card .card-icon { width: 1.75rem; height: 1.75rem; }
+  .w-body .device-card .card-icon > svg { width: 1rem; height: 1rem; }
   .hw-jelly-posters { min-height: 4.5rem; }
   .hw-wx-hour-bar { height: 0.75rem; }
   /* Scoped to .w-body: the Smart Home *tab* keeps its own tile height,
@@ -2920,12 +3126,14 @@ html.light .device-card.on {
   background: #18183a;
   border-color: #2a2a60;
 }
-html.light .card-icon  { color: #9090a8; }
+html.light .card-icon  { background: #d2d2de; color: #6a6a80; }
 html.light .card-name  { color: #28283a; }
 html.light .card-state { color: #7878a0; }
-html.light .device-card.on .card-icon  { color: #a0a0ff; }
+html.light .device-card.on .card-icon  { background: rgba(160,160,255,0.18); color: #a0a0ff; }
 html.light .device-card.on .card-name  { color: #e0e0f8; }
 html.light .device-card.on .card-state { color: #8080d0; }
+html.light .light-detail-open { border-left-color: rgba(0,0,0,0.12); }
+html.light .device-card.on .light-detail-open { border-left-color: rgba(255,255,255,0.14); }
 
 /* Home widget shell.
    The light theme is a set of explicit overrides, not token
@@ -3283,8 +3491,30 @@ html.light .sheet-handle { background: #c0c0d0; }
 html.light .sheet-power-label { color: #505068; }
 html.light .sheet-control-label { color: #50506a; }
 html.light .sheet-control-value { color: #14141c; }
+html.light .fill-bar { background: #dcdce6; }
+/* The colour-temperature ramp is physical, not thematic, so it stays put in
+   both themes. Re-declared because html.light .fill-bar (0,2,1) outranks
+   .fill-bar--ct (0,1,0) and was flattening the gradient to plain grey. */
+html.light .fill-bar--ct {
+  background: linear-gradient(90deg, #f0d0a1, #ffffff 55%, #b5cad7);
+}
+html.light .fill-bar-fill { background: #6060cc; }
+html.light .fill-bar-knob {
+  background: #ffffff;
+  -webkit-box-shadow: 0 0 0 1px rgba(0,0,0,0.22); box-shadow: 0 0 0 1px rgba(0,0,0,0.22);
+}
+html.light .sheet-chip {
+  background: #f0f0f6; border-color: #d0d0da; color: #40405a;
+}
+html.light .sheet-chip.is-on {
+  background: #dedeff; border-color: #9090d8; color: #3a3a90;
+}
+html.light .seg { border-color: #d0d0da; }
+html.light .seg-btn { color: #6a6a85; }
+html.light .seg-btn.is-on { background: #dedeff; color: #26264a; }
+html.light .sheet-more { border-color: #d0d0da; color: #6a6a85; }
+html.light .sheet-swatch.is-on { border-color: #26264a; }
 html.light .sheet-control { border-bottom-color: #d4d4e0; }
-html.light .sheet-colorwheel-header { color: #50506a; }
 
 /* Chartist overrides for light theme */
 html.light .ct-grid { stroke: rgba(0,0,0,0.08); }

@@ -16,6 +16,7 @@ Banned in `frontend/`:
 | `var()` **inside** `calc()` | buggy in Safari 9.1–11 | a literal `rem`, with a comment noting the coupling |
 | `object-fit` | iOS 10 | already wrapped in `@supports not (object-fit: cover)` |
 | `env(safe-area-inset-*)` | iOS 11.2 | fine, but a plain fallback **must** be declared first |
+| `document.hidden` / `visibilitychange` | iOS 10.3 | `window._appHidden()` / `window._onAppVisible(cb)` — app.js resolves the `webkit`-prefixed pair once. The unprefixed event never fires on 9.3 and `document.hidden` reads `undefined`, so a `if (document.hidden) return` guard silently stops guarding |
 | ES6+ syntax/APIs | — | ES5 only: `var`, `function`, XHR. No arrow fns, `let`/`const`, template literals, `Promise`, `fetch`, `Object.assign`, `Array.includes`, `NodeList.forEach` |
 
 Allowed and used heavily: CSS custom properties (iOS 9.3), `rem` (iOS 4), `calc()` (iOS 6), `@media`, `@supports`, `.dataset`, `orientationchange`.
@@ -33,7 +34,7 @@ npm run test:backend         # supertest against the express routes
 npm run test:frontend        # jsdom; includes tests/frontend/es5-compat.test.js
 npx jest -t "name"           # single test by name
 
-npm run test:visual          # playwright screenshot regression (67 shots)
+npm run test:visual          # playwright screenshot regression (72 shots)
 npm run test:visual:update   # re-baseline after an INTENDED visual change
 npm run test:visual:capture  # re-record tests/visual/fixtures from a live backend on :3000
 ```
@@ -55,11 +56,15 @@ There is no module system, so **load order is the dependency graph**: `widgets.j
 - `window._onSettingsLoad(cb)` — modules register here to receive settings on load
 - `window._toast`, `window._openPinPrompt`, `window._guardDeviceAction`, `window._openLightSheet`
 - `window._homeRefresh`, `window._syncHACard`, `window._mergeHAEntities` — Home/Smart-Home state sync
+- `window._haDeviceTile(entity)` / `window._haGhostTile(id, label)` — the device tile, built in one place (see below)
+- `window._haAllOff(entities)` / `window._haEntitySnapshot()` — switch a set of devices off, and the live snapshot to pick that set from
 - `window._WIDGETS` — the Home widget registry (see below)
 
 ### Home widgets (`js/widgets.js`)
 
 The Home tab is one wrapping flex grid (`.w-grid`) of cards, built from the `home_widgets` array in settings. `widgets.js` holds the registry, the card shell, and every widget definition; `app.js`'s HOME module only decides *what* appears and in *what order*.
+
+The Smart Home widget is the one that reaches across: its **tiles** are built by `app.js`'s SMARTHOME module and fetched through `window._haDeviceTile`, because everything a tile needs already lives there — `state.toggling`, `callService`, `applyCardColor`, the light sheet. `widgets.js` used to build its own near-copy, kept in step by hand through three more globals, and the two had drifted: only the tab's tiles had the in-flight toggle guard, the busy state, the rollback on a failed call and the colour tint. What the widget still owns is which entities appear and the header count. `tests/frontend/dom.test.js` asserts the two render structurally identical tiles, so the second renderer cannot grow back.
 
 - **A widget definition** is `{ type, title, page, wide, aggregate, flush, refreshSec, render(ctx) }`. `render` fills `ctx.body` and **must be safe to call repeatedly on the same ctx** — the refresh scheduler re-runs it into the existing shell.
 - **`aggregate: true`** means every `home_widgets` entry of that type collapses into one card (Smart Home, Markets). Otherwise it is one card per entry.
@@ -68,6 +73,22 @@ The Home tab is one wrapping flex grid (`.w-grid`) of cards, built from the `hom
 - Adding a widget: register it in `widgets.js`, add its `html.light` overrides (the light theme is explicit overrides, not tokens), add a fixture to `tests/visual/fixtures/` plus a `_manifest.json` entry, and add the entry to the fixture `settings.json` so the visual suite actually renders it.
 
 Every page lives in `index.html` as a `.page` div, shown/hidden by tab; nothing is routed or lazily loaded.
+
+### Smart Home tab and the light sheet
+
+Three things here are invariants rather than choices, and all three are easy to break by accident.
+
+**`tileSignature(entity)` is the tile's cache key.** The 15-second poll compares it against the tile's `data-sig` and does nothing at all when they match — which is what keeps a panel that is static for hours from doing a style recalc and a gradient repaint every 15 seconds. It must therefore list *everything* `syncCardFromEntity` renders and nothing it doesn't. Render a new attribute on a tile without adding it to the signature and the tile will simply never update for it.
+
+**`state.toggling[eid]` is `{ inFlight, expect, until }`, not a boolean.** `inFlight` blocks a second tap while the request is out; `expect` + `until` stop the poll overwriting an optimistic state until HA agrees or `SETTLE_MS` passes. These were one flat 500ms timer, which is why every tap used to leave a dimmed, dead tile behind it. `.busy` now appears only if a call is still out after `BUSY_AFTER_MS`.
+
+**A plain tile is a `div` with `role="button"`, and `bindButtonRole` is what makes that honest.** It adds the role, a `tabindex`, and Enter/Space handling — the last of which is not optional: `role="button"` without a keyboard announces as a button and then refuses to be operated as one. The keyboard half is deliberately *not* in `bindTap`, which is also used on real `<button>`s that already activate on Enter and Space; binding `keydown` there too would fire those handlers twice. `aria-pressed` goes on the tile for a plain device but on the inner `.light-main-toggle` for a light, since a light tile is a div hosting two real buttons and a button may not contain buttons — `pressHost()` picks the right one and `setPressed()` only writes where the attribute already exists, so an offline tile that never had a role does not get a state it cannot honour.
+
+**`bindTap` is not the PIN keypad's `bindFastInteraction`.** Both make a control answer on release instead of waiting for the delayed synthetic `click`, but the keypad's version cancels the touch on `touchstart`, which it can afford in a fixed overlay with nothing behind it. A device tile sits in a scrolling page, so cancelling there would stop the grid scrolling wherever a finger landed. `bindTap` lets the touch run and claims it on `touchend` only if it stayed within `TAP_SLOP_PX` and `TAP_MAX_MS`. Don't "simplify" one into the other.
+
+The sheet's colour wheel is drawn on first disclosure, never on open: it is 360 canvas wedges plus one white radial gradient (exactly equivalent to HSV at V=1, where saturation is the normalised radius). It replaced a hand-written 57,600-pixel raster that ran synchronously inside the open path and stuttered the slide-up once per session.
+
+`allOff` takes the candidate entities rather than deciding them, because the two callers legitimately mean different sets: the tab acts on everything it shows (`state.entities`), the widget only on what is pinned. It sends one service call per distinct service with `entity_id` as an array. The backend's protection check reads `entity_id` in string, array and `target` form, so batching cannot slip a locked device past the PIN. The button reads the live snapshot through `window._haEntitySnapshot()` rather than the `ctx.entities` it was bound with — that list is empty on a fresh launch, since the card renders before the first HA response arrives.
 
 ### Knowing when the page is stale
 
@@ -110,7 +131,9 @@ A `:root` token layer (~72 tokens: colour, type, spacing, radius) drives everyth
 
 ### Visual regression harness (`tests/visual/`)
 
-The safety net for CSS work, since there is no build step and no other coverage of rendering. 67 screenshots: 7 tabs across 6 viewports, plus a light-theme and two text-size passes, plus four states no tab shot reaches (the PIN overlay, the Jellyfin detail, and the weather day detail in both themes).
+The safety net for CSS work, since there is no build step and no other coverage of rendering. 72 screenshots: 7 tabs across 6 viewports, plus a light-theme and two text-size passes, plus nine states no tab shot reaches (the PIN overlay, the Jellyfin detail, the weather day detail in both themes, the light sheet in four — colour-temperature-only in both themes, colour-capable, and colour-capable with the wheel disclosed — and the Proxmox VM action row for a running QEMU guest, the state in which every button in it appears at once).
+
+A test can serve a state the captured data does not contain by passing `fixtures` to `gotoApp`: a `{ pathname: fn }` map whose function receives the parsed fixture body and returns what to serve instead. It runs *before* the not-captured fallback, so it can also supply a response the fixtures never recorded — the function just receives `{}`. The light-sheet colour shots use it to turn a colour-capable bulb on; the VM action shot uses it to supply a per-VM status, which nothing had ever requested during a capture. It belongs in the spec rather than in the fixture because `capture-fixtures.js` rewrites those files wholesale, so anything hand-added to one is dropped silently at the next capture — the fixture `settings.json` is the deliberate exception, and it is never overwritten.
 
 Runs are hermetic: a dependency-free static server serves `frontend/`, all `/api/*` is replayed from `tests/visual/fixtures/`, `Date` is frozen, and theme/text-size are seeded into `localStorage` before first paint. No backend or network needed.
 

@@ -36,7 +36,15 @@ function bodyFor(pathname, search) {
   return fs.readFileSync(path.join(FIX_DIR, loose.file), 'utf8');
 }
 
-async function installFixtures(page) {
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {Object} [overrides] — pathname -> function(parsedBody) returning the
+ *   body to serve instead. Used where a state the UI must render does not
+ *   exist in the captured data. It lives here rather than in the fixture
+ *   because capture-fixtures.js rewrites those files wholesale, so anything
+ *   hand-added to one is silently dropped the next time they are recaptured.
+ */
+async function installFixtures(page, overrides) {
   await page.route('**/api/**', async function (route) {
     var u = new URL(route.request().url());
 
@@ -58,7 +66,12 @@ async function installFixtures(page) {
     }
 
     var body = bodyFor(u.pathname, u.search);
-    if (body === null) {
+    /* An override runs before the not-captured fallback, so it can supply a
+       response the fixtures never recorded as well as transform one they
+       did — it receives {} in that case. */
+    if (overrides && overrides[u.pathname]) {
+      body = JSON.stringify(overrides[u.pathname](JSON.parse(body === null ? '{}' : body)));
+    } else if (body === null) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     }
     return route.fulfill({ status: 200, contentType: 'application/json', body: body });
@@ -93,7 +106,7 @@ async function freezeEnvironment(page, opts) {
 }
 
 async function gotoApp(page, opts) {
-  await installFixtures(page);
+  await installFixtures(page, opts.fixtures);
   await freezeEnvironment(page, opts);
   await page.goto('/', { waitUntil: 'load' });
   await page.waitForSelector('#tab-bar');
@@ -204,6 +217,95 @@ test.describe('overlays', function () {
         await expect(page).toHaveScreenshot('overlay-weather-day-' + theme + '.png');
       }
     });
+  });
+
+  /* The light sheet is the only route to brightness, colour temperature and
+     colour, and no shot reached it before — the tab shots stop at the tile.
+     Two lights are needed because the sheet shows different controls for
+     each: the fixture's only reachable light is colour-temperature-only,
+     which covers the bar, the chips and the no-segmented layout; a
+     colour-capable one has to be turned on through an override to reach the
+     White/Colour switch and the swatches. */
+  function colourLightOn(payload) {
+    for (var i = 0; i < payload.entities.length; i++) {
+      var e = payload.entities[i];
+      if (e.entity_id !== 'light.yeelight') continue;
+      e.state = 'on';
+      e.attributes.color_mode = 'hs';
+      e.attributes.brightness = 178;
+      e.attributes.hs_color = [280, 85];
+      e.attributes.rgb_color = [214, 38, 255];
+    }
+    return payload;
+  }
+
+  async function openSheet(page, index) {
+    await openTab(page, 'smarthome');
+    /* Scoped to the tab: the Home widget renders the same tiles and comes
+       first in the DOM, so an unscoped locator picks a hidden one. */
+    await page.locator('#page-smarthome .light-detail-open').nth(index).click();
+    await page.waitForTimeout(600);
+  }
+
+  ['dark', 'light'].forEach(function (theme) {
+    test('light sheet @ ' + theme, async function ({ page }) {
+      await gotoApp(page, { theme: theme, fontSize: 'normal' });
+      await openSheet(page, 0);
+      await expect(page).toHaveScreenshot('overlay-light-sheet-' + theme + '.png');
+    });
+  });
+
+  test('light sheet colour', async function ({ page }) {
+    await gotoApp(page, {
+      theme: 'dark', fontSize: 'normal',
+      fixtures: { '/api/ha/devices': colourLightOn }
+    });
+    await openSheet(page, 1);
+    await expect(page).toHaveScreenshot('overlay-light-sheet-colour.png');
+  });
+
+  test('light sheet colour wheel', async function ({ page }) {
+    await gotoApp(page, {
+      theme: 'dark', fontSize: 'normal',
+      fixtures: { '/api/ha/devices': colourLightOn }
+    });
+    await openSheet(page, 1);
+    await page.click('#btn-color-wheel');
+    await page.waitForTimeout(400);
+    await page.locator('#ctrl-color-wheel').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+    await expect(page).toHaveScreenshot('overlay-light-sheet-wheel.png');
+  });
+
+  /* The Proxmox VM action row had no shot at all, and that is precisely how
+     a Shutdown button which rendered as nothing on the device survived: its
+     glyph was U+23FB, Unicode 9.0, newer than iOS 9.3. It is now the densest
+     row of drawn icons in the app, so it is worth a baseline. A running QEMU
+     guest is chosen deliberately — that is the state in which every button
+     in the row appears at once. Wider viewport because the Server tab is a
+     master/detail split and is exempt from the content cap at every width. */
+  test('server vm actions', async function ({ page }) {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await gotoApp(page, {
+      theme: 'dark', fontSize: 'normal',
+      /* The captured set has no per-VM status at all — that request was
+         never exercised, which is part of why this row went unchecked for
+         so long. Without it the detail renders the stopped action set and
+         the buttons worth covering never appear. */
+      fixtures: {
+        '/api/px/nodes/proxmox/qemu/101/status': function () {
+          return {
+            status: 'running', name: 'ubuntu-server', cpu: 0.0724, cpus: 4,
+            mem: 9824870400, maxmem: 10737418240, uptime: 444959,
+            diskread: 0, diskwrite: 0, netin: 47082755449, netout: 14648556352
+          };
+        }
+      }
+    });
+    await openTab(page, 'server');
+    await page.locator('.px-tree-item.px-vm').first().click();
+    await page.waitForTimeout(800);
+    await expect(page).toHaveScreenshot('overlay-server-vm-actions.png');
   });
 
   test('jellyfin detail', async function ({ page }) {

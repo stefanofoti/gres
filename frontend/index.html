@@ -77,7 +77,20 @@
       </div>
       <div class="page-content">
         <div class="smarthome-top-actions">
-          <button id="smarthome-refresh-btn" class="btn-icon-only" title="Refresh devices">↻</button>
+          <button id="smarthome-alloff-btn" class="btn-icon-only" type="button"
+                  title="Turn everything off" aria-label="Turn everything off">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+              <path d="M12 3v8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M17.2 6.3a7.5 7.5 0 1 1-10.4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button id="smarthome-refresh-btn" class="btn-icon-only" type="button"
+                  title="Refresh devices" aria-label="Refresh devices">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+              <path d="M20 4v4.5h-4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         </div>
         <div id="smarthome-loading" class="loading-state">
           <div class="spinner"></div>
@@ -714,12 +727,13 @@
   </div>
   <div id="light-sheet-backdrop">
     <div id="light-sheet">
-      <div class="sheet-handle"></div>
+      <!-- The bar is 4px; the area you can pull is not. -->
+      <div class="sheet-grip" id="sheet-grip"><div class="sheet-handle"></div></div>
 
       <div class="sheet-header">
         <div class="sheet-color-dot" id="sheet-color-dot"></div>
         <div class="sheet-title" id="sheet-title">Light</div>
-        <button class="sheet-close" id="sheet-close">×</button>
+        <button class="sheet-close" id="sheet-close" type="button" aria-label="Close">&times;</button>
       </div>
 
       <!-- Power -->
@@ -730,35 +744,64 @@
         </div>
       </div>
 
-      <!-- Brightness -->
+      <!-- Brightness. The bar IS the value: no thumb to hit, the whole
+           56px surface drags, and the four chips cover the values people
+           actually pick. -->
       <div class="sheet-control" id="ctrl-brightness">
         <div class="sheet-control-header">
           <div class="sheet-control-label">Brightness</div>
-          <div class="sheet-control-value" id="val-brightness">—</div>
+          <div class="sheet-control-value" id="val-brightness">&mdash;</div>
         </div>
-        <input type="range" class="sheet-slider slider-brightness"
-               id="slider-brightness" min="1" max="255" value="255">
+        <div class="fill-bar" id="bar-brightness" role="slider"
+             aria-label="Brightness" aria-valuemin="1" aria-valuemax="100">
+          <div class="fill-bar-fill" id="fill-brightness"></div>
+        </div>
+        <div class="sheet-chips">
+          <button class="sheet-chip" type="button" data-pct="25">25%</button>
+          <button class="sheet-chip" type="button" data-pct="50">50%</button>
+          <button class="sheet-chip" type="button" data-pct="75">75%</button>
+          <button class="sheet-chip" type="button" data-pct="100">100%</button>
+        </div>
       </div>
 
-      <!-- Color temperature -->
+      <!-- White / Colour. Shown only when the light does both: they are
+           mutually exclusive server-side, and presenting them at once let
+           the two controls contradict each other. -->
+      <div class="sheet-control" id="ctrl-mode">
+        <div class="seg" id="seg-mode">
+          <button class="seg-btn" type="button" data-mode="white">White</button>
+          <button class="seg-btn" type="button" data-mode="color">Colour</button>
+        </div>
+      </div>
+
+      <!-- Colour temperature -->
       <div class="sheet-control" id="ctrl-colortemp">
         <div class="sheet-control-header">
-          <div class="sheet-control-label">Color temperature</div>
-          <div class="sheet-control-value" id="val-colortemp">—</div>
+          <div class="sheet-control-label">Colour temperature</div>
+          <div class="sheet-control-value" id="val-colortemp">&mdash;</div>
         </div>
-        <input type="range" class="sheet-slider slider-colortemp"
-               id="slider-colortemp" min="153" max="500" value="300">
+        <div class="fill-bar fill-bar--ct" id="bar-colortemp" role="slider"
+             aria-label="Colour temperature">
+          <div class="fill-bar-knob" id="knob-colortemp"></div>
+        </div>
+        <div class="sheet-chips" id="chips-ct"></div>
       </div>
 
-      <!-- Color wheel -->
-      <div class="sheet-colorwheel-wrap" id="ctrl-color">
-        <div class="sheet-colorwheel-header">
-          <div class="sheet-control-label">Color</div>
-          <div class="sheet-control-value" id="val-color">—</div>
+      <!-- Colour. Swatches first; the wheel is precision work and stays
+           folded away until asked for. -->
+      <div class="sheet-control" id="ctrl-color">
+        <div class="sheet-control-header">
+          <div class="sheet-control-label">Colour</div>
+          <div class="sheet-control-value" id="val-color">&mdash;</div>
         </div>
-        <div class="colorwheel-wrap-inner">
-          <canvas id="light-color-canvas" width="240" height="240"></canvas>
-          <div class="colorwheel-cursor" id="colorwheel-cursor"></div>
+        <div class="sheet-swatches" id="color-swatches"></div>
+        <button class="sheet-more" id="btn-color-wheel" type="button"
+                aria-expanded="false">Colour wheel</button>
+        <div class="sheet-colorwheel-wrap hidden" id="ctrl-color-wheel">
+          <div class="colorwheel-wrap-inner">
+            <canvas id="light-color-canvas" width="240" height="240"></canvas>
+            <div class="colorwheel-cursor" id="colorwheel-cursor"></div>
+          </div>
         </div>
       </div>
 

@@ -25,6 +25,49 @@
   function show(el) { el.classList.remove('hidden'); }
   function hide(el) { el.classList.add('hidden'); }
 
+  /* ── page visibility ───────────────────────────
+     Safari exposes the Page Visibility API unprefixed only from
+     iOS 10.3. On the wall panel's iOS 9.3 WebKit it exists solely as
+     document.webkitHidden / 'webkitvisibilitychange', and the
+     unprefixed spellings fail in the two ways that are hardest to
+     notice from a desktop browser: the 'visibilitychange' listener is
+     accepted and simply never fires, and document.hidden reads
+     undefined — falsy, so an `if (document.hidden) return` guard stops
+     guarding instead of throwing. Resolve the pair once here; every
+     module goes through appHidden/onAppVisible (also exposed as
+     window._appHidden / window._onAppVisible) rather than naming
+     either spelling itself. */
+  var VIS_HIDDEN_PROP = 'hidden';
+  var VIS_EVENT       = 'visibilitychange';
+  if (typeof document.hidden === 'undefined' &&
+      typeof document.webkitHidden !== 'undefined') {
+    VIS_HIDDEN_PROP = 'webkitHidden';
+    VIS_EVENT       = 'webkitvisibilitychange';
+  }
+  var _visStartedAt = Date.now();
+
+  function appHidden() { return !!document[VIS_HIDDEN_PROP]; }
+
+  /* Runs cb every time the app becomes visible again. Callers debounce
+     their own work — iOS can deliver more than one of these signals for
+     a single unlock. */
+  function onAppVisible(cb) {
+    document.addEventListener(VIS_EVENT, function () {
+      if (!appHidden()) cb();
+    }, false);
+    /* Safety net: iOS 9 in standalone (home-screen) mode is not
+       reliable about firing the visibility event on unlock, and window
+       focus does arrive. Focus during the first seconds is the browser
+       handing the fresh document focus, not a wake, so ignore it —
+       otherwise a normal launch would raise the wake overlay. */
+    window.addEventListener('focus', function () {
+      if (Date.now() - _visStartedAt < 3000) return;
+      if (!appHidden()) cb();
+    }, false);
+  }
+  window._appHidden    = appHidden;
+  window._onAppVisible = onAppVisible;
+
   /* ── XHR ────────────────────────────────────────────── */
   function xhr(method, url, body, cb) {
     var req = new XMLHttpRequest();
@@ -178,8 +221,8 @@
   /* ── clock + greeting ──────────────────────────────────
      Both are re-derived from `new Date()` on every tick (rather than
      computed once at load) so they stay correct across an hour/day
-     boundary and the moment the app wakes from standby — see the
-     visibilitychange handler below. */
+     boundary and the moment the app wakes from standby — see
+     onAppVisible/onAppWake below. */
   function tick() {
     var n = new Date(), h = n.getHours(), m = n.getMinutes();
     $('clock').textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
@@ -501,14 +544,13 @@ if (pinReady) {
     })();
   }
 
-  document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) onAppWake();
-  }, false);
+  onAppVisible(onAppWake);
 
   /* Fallback for the rarer case where iOS purges the page from memory
      during a long lock and restores it from the back/forward cache
-     instead of just unpausing it — visibilitychange alone would miss
-     that. The 2s debounce above absorbs the case where both fire. */
+     instead of just unpausing it — onAppVisible alone would miss that,
+     since neither visibility nor focus changes. The 2s debounce above
+     absorbs the case where both fire. */
   window.addEventListener('pageshow', function (e) {
     if (e.persisted) onAppWake();
   }, false);
@@ -539,15 +581,74 @@ if (pinReady) {
     { key: 'covers',   label: 'Covers',      domains: ['cover'] }
   ];
 
+  /* Device icons — drawn, not typed.
+     These were typographic glyphs (○ ⌁ ▷ ◇ ◎ ▭) rendered as text at 22px.
+     ⌁ (U+2301) is absent from the iOS 9.3 system fonts, so switches and
+     input_booleans fell through to a hairline symbol face or to tofu, and
+     none of the set had enough mass to read from across a room — which is
+     the whole job on a wall panel. Stroked with currentColor so the
+     existing .card-icon / .device-card.on colour rules still drive them,
+     and sized entirely from CSS so the text-size lever keeps working. The
+     width/height attributes are only a floor for the moment before the
+     stylesheet applies: an inline SVG with no dimensions defaults to
+     300x150. Held as markup, so every render site uses innerHTML. */
+  function icon(body) {
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" ' +
+           'aria-hidden="true" focusable="false" ' +
+           'stroke="currentColor" stroke-width="1.8" ' +
+           'stroke-linecap="round" stroke-linejoin="round">' + body + '</svg>';
+  }
+
   var ICONS = {
-    light: '○', switch: '⌁', input_boolean: '⌁',
-    media_player: '▷', climate: '◇', fan: '◎', cover: '▭'
+    /* bulb over its base */
+    light: icon('<path d="M12 3a6 6 0 0 1 3.5 10.9c-.6.4-.9 1-.9 1.7V17H9.4v-1.4c0-.7-.3-1.3-.9-1.7A6 6 0 0 1 12 3z"/>' +
+                '<path d="M9.8 20.2h4.4"/>'),
+    /* wall plug */
+    switch: icon('<path d="M9 3v4M15 3v4"/>' +
+                 '<path d="M6 7h12v3.5a6 6 0 0 1-12 0V7z"/>' +
+                 '<path d="M12 16.5V21"/>'),
+    /* rocker switch */
+    input_boolean: icon('<rect x="3" y="7" width="18" height="10" rx="5"/>' +
+                        '<circle cx="8.5" cy="12" r="2.3"/>'),
+    /* screen with a play mark */
+    media_player: icon('<rect x="2.5" y="4.5" width="19" height="13" rx="2"/>' +
+                       '<path d="M10.4 9.4l4.2 2.6-4.2 2.6V9.4z"/>' +
+                       '<path d="M8 21h8"/>'),
+    /* thermometer */
+    climate: icon('<path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/>' +
+                  '<path d="M12 9.5V15"/>'),
+    /* four-blade fan */
+    fan: icon('<circle cx="12" cy="12" r="1.9"/>' +
+              '<path d="M12 10.1V4.4a3.2 3.2 0 0 1 3.2 3.2c0 1.4-1.3 2.5-3.2 2.5z"/>' +
+              '<path d="M13.9 12h5.7a3.2 3.2 0 0 1-3.2 3.2c-1.4 0-2.5-1.3-2.5-3.2z"/>' +
+              '<path d="M12 13.9v5.7a3.2 3.2 0 0 1-3.2-3.2c0-1.4 1.3-2.5 3.2-2.5z"/>' +
+              '<path d="M10.1 12H4.4a3.2 3.2 0 0 1 3.2-3.2c1.4 0 2.5 1.3 2.5 3.2z"/>'),
+    /* blinds */
+    cover: icon('<rect x="3.5" y="3.5" width="17" height="14" rx="1.5"/>' +
+                '<path d="M3.5 8.2h17M3.5 12.9h17"/>' +
+                '<path d="M12 17.5V21"/>'),
+    /* anything the map does not know */
+    device: icon('<rect x="4" y="4" width="16" height="16" rx="4"/>' +
+                 '<circle cx="12" cy="12" r="2.4"/>')
   };
+
+  /* The chevron into the light sheet. Same reason as the set above: the
+     tile used a bare '›' at 19px, which is the least visible thing on a
+     control that is the only route to brightness and colour. */
+  var CHEVRON_ICON = icon('<path d="M9.5 5l7 7-7 7"/>');
+
+  /**
+   * SVG source for a domain's icon, falling back to a generic device.
+   *
+   * @param {string} domain
+   * @returns {string} markup — inject with innerHTML, never textContent
+   */
+  function iconMarkup(domain) { return ICONS[domain] || ICONS.device; }
 
   var STATE_LABELS = {
     on: 'on', off: 'off', open: 'open', closed: 'closed',
     playing: 'playing', paused: 'paused', idle: 'idle',
-    unavailable: 'unavailable', unknown: 'unknown', standby: 'standby'
+    unavailable: 'offline', unknown: 'unknown', standby: 'standby'
   };
 
   function domainOf(eid) { return eid.split('.')[0]; }
@@ -563,21 +664,264 @@ if (pinReady) {
       : entity.entity_id.split('.')[1].replace(/_/g, ' ');
   }
 
-  /* ── light capability detection ─────────────────────── */
-  function lightCaps(entity) {
-    var modes = (entity.attributes && entity.attributes.supported_color_modes) || [];
-    // supported_features bitmask fallback
-    var sf = (entity.attributes && entity.attributes.supported_features) || 0;
-    return {
-      brightness: modes.indexOf('brightness') !== -1 || modes.indexOf('color_temp') !== -1 ||
-                  modes.indexOf('hs') !== -1 || modes.indexOf('rgb') !== -1 ||
-                  modes.indexOf('xy') !== -1 || modes.indexOf('rgbw') !== -1 ||
-                  modes.indexOf('rgbww') !== -1 || (sf & 1) !== 0,
-      colorTemp:  modes.indexOf('color_temp') !== -1 || modes.indexOf('rgbww') !== -1 || (sf & 2) !== 0,
-      color:      modes.indexOf('hs') !== -1 || modes.indexOf('rgb') !== -1 ||
-                  modes.indexOf('xy') !== -1 || modes.indexOf('rgbw') !== -1 ||
-                  modes.indexOf('rgbww') !== -1 || (sf & 16) !== 0
+  /* ── tap ────────────────────────────────────────────────
+     `click` on a touch device does not fire on release: the browser holds
+     it back until it is satisfied the gesture was not the start of a
+     scroll. Inside .page-content — which is exactly what a device tile
+     sits in — that wait is real, and it is the difference between a tile
+     that answers the finger and one that thinks about it first.
+
+     This is NOT the PIN keypad's bindFastInteraction. That one cancels the
+     touch outright on touchstart, which it can afford: it lives in a fixed
+     overlay with nothing behind it to scroll. Cancelling a tile's touch
+     would stop the grid scrolling wherever a finger happened to land, and
+     on this tab that is nearly everywhere. So the touch runs normally and
+     is only claimed on release, once it is known not to have travelled far
+     enough or lasted long enough to have been a scroll or a long press.
+     ─────────────────────────────────────────────────────── */
+  var TAP_SLOP_PX = 10;
+  var TAP_MAX_MS  = 700;
+  var CLICK_ECHO_MS = 700;
+
+  /**
+   * @param {HTMLElement} el
+   * @param {Function} handler — receives the originating event
+   */
+  function bindTap(el, handler) {
+    var x0 = 0, y0 = 0, t0 = 0, tracking = false, handledAt = 0;
+
+    el.addEventListener('touchstart', function (e) {
+      /* A second finger means this is not a tap. */
+      if (e.touches.length !== 1) { tracking = false; return; }
+      tracking = true;
+      x0 = e.touches[0].clientX;
+      y0 = e.touches[0].clientY;
+      t0 = Date.now();
+    }, false);
+
+    el.addEventListener('touchmove', function (e) {
+      /* A touch list can arrive empty — an interrupted or multi-touch
+         gesture — and a TypeError raised in here kills the interaction
+         with no trace on a device with no console. */
+      if (!tracking || !e.touches.length) return;
+      var dx = e.touches[0].clientX - x0;
+      var dy = e.touches[0].clientY - y0;
+      if (dx * dx + dy * dy > TAP_SLOP_PX * TAP_SLOP_PX) tracking = false;
+    }, false);
+
+    el.addEventListener('touchend', function (e) {
+      if (!tracking) return;
+      tracking = false;
+      if (Date.now() - t0 > TAP_MAX_MS) return;
+      /* Claiming the gesture also suppresses the synthetic click that would
+         otherwise run the handler a second time. */
+      if (e.cancelable) e.preventDefault();
+      handledAt = Date.now();
+      handler(e);
+    }, false);
+
+    el.addEventListener('touchcancel', function () { tracking = false; }, false);
+
+    /* Non-touch input — desktop, and the test suites.
+       preventDefault on touchend is what stops the synthetic click, and it
+       has been dependable on iOS for as long as FastClick relied on it. But
+       the cost of being wrong here is not cosmetic: the handler would run
+       twice and a tap would switch a device on and straight back off,
+       looking for all the world like the tile had ignored it. So the click
+       path is fenced off behind a timestamp as well — the same belt-and-
+       braces the tap-sound module uses against the same echo. A real second
+       tap is unaffected: it arrives with its own touchend and never needs
+       this path. */
+    el.addEventListener('click', function (e) {
+      if (Date.now() - handledAt < CLICK_ECHO_MS) return;
+      handler(e);
+    }, false);
+  }
+
+  /**
+   * Make a non-button element behave like one: tap, Enter and Space all
+   * activate it, and assistive tech is told what it is.
+   *
+   * A real <button> would be better and is not available here. The light
+   * variant of a tile nests two buttons inside it and a button may not
+   * contain buttons, so the tile has to stay a div — and making only the
+   * plain tiles buttons would put the two variants back on different
+   * elements, which is exactly the divergence one renderer exists to stop.
+   *
+   * The keyboard half lives here rather than in bindTap because bindTap is
+   * also used on real buttons, which already activate on Enter and Space;
+   * binding keydown there as well would fire those handlers twice. And
+   * role="button" without it would be worse than no ARIA at all: it would
+   * announce as a button and then refuse to be operated as one.
+   *
+   * @param {HTMLElement} el
+   * @param {Function} handler
+   */
+  function bindButtonRole(el, handler) {
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    bindTap(el, handler);
+    el.addEventListener('keydown', function (e) {
+      /* keyCode, not e.key: iOS 9.3 WebKit implements e.key only partly. */
+      if (e.keyCode !== 13 && e.keyCode !== 32) return;
+      e.preventDefault();
+      handler(e);
+    }, false);
+  }
+
+  /**
+   * Where aria-pressed belongs on a tile: the inner button for a light,
+   * the tile itself for everything else. A light tile is a div hosting two
+   * real buttons, so the state has to sit on the one that toggles.
+   *
+   * @param {HTMLElement} card
+   * @returns {HTMLElement}
+   */
+  function pressHost(card) {
+    return card.querySelector('.light-main-toggle') || card;
+  }
+
+  /**
+   * Reflect the on/off state for assistive tech, but only on a tile that
+   * was built interactive — an offline one never got a role to go with it,
+   * and aria-pressed on a plain div means nothing.
+   *
+   * @param {HTMLElement} card
+   * @param {boolean} on
+   */
+  function setPressed(card, on) {
+    var host = pressHost(card);
+    if (host.hasAttribute('aria-pressed')) {
+      host.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+  }
+
+  /* ── optimistic state, settled by the poll ──────────────
+     A tap paints the new state at once and the request goes out. What is
+     left is the window where the tile shows what was asked for and HA still
+     reports the old value. That window used to be a flat 500ms of `.busy` —
+     a dimmed, non-responsive tile after EVERY tap, added on top of the
+     round trip whether or not the call had already returned. It is most of
+     why the tab felt slow.
+
+     One timer was doing two unrelated jobs, so they are now separate:
+
+       inFlight — the request has not come back. Blocks a second tap on the
+                  same device so two contradictory calls cannot queue.
+                  Cleared the moment the response lands, not 500ms later.
+
+       expect   — what the device was asked to become. Keeps the poll from
+                  overwriting the tile until HA agrees, or until SETTLE_MS
+                  has passed and it plainly is not going to. This is the job
+                  that genuinely needed a delay, and it now ends when the
+                  truth arrives rather than on a stopwatch.
+
+     BUSY_AFTER_MS keeps the dimming for the case it was meant for: a call
+     that is actually slow. On a healthy LAN it never fires.
+     ─────────────────────────────────────────────────────── */
+  var SETTLE_MS     = 6000;
+  var BUSY_AFTER_MS = 250;
+
+  /**
+   * @param {string} eid
+   * @param {string} expect — the state the device was asked to reach
+   */
+  function markPending(eid, expect) {
+    state.toggling[eid] = { inFlight: true, expect: expect, until: Date.now() + SETTLE_MS };
+  }
+
+  function isInFlight(eid) {
+    var p = state.toggling[eid];
+    return !!(p && p.inFlight);
+  }
+
+  /**
+   * Dim the tile only if the call is still out after BUSY_AFTER_MS.
+   *
+   * @param {HTMLElement} card
+   * @returns {Function} call to cancel/clear
+   */
+  function busyAfterDelay(card) {
+    var t = setTimeout(function () { card.classList.add('busy'); }, BUSY_AFTER_MS);
+    return function () {
+      clearTimeout(t);
+      card.classList.remove('busy');
     };
+  }
+
+  /* ── light capability detection ─────────────────────── */
+  /**
+   * Which controls the sheet may show for this light.
+   *
+   * supported_color_modes is the only source of truth. The old version also
+   * OR-ed in bits 1/2/16 of supported_features as BRIGHTNESS / COLOR_TEMP /
+   * COLOR — meanings deprecated in HA 2021.5 and since reused: those bits
+   * now mean EFFECT, FLASH and TRANSITION. A current light reporting 19
+   * (= 16+2+1) was therefore read as having full colour support whether or
+   * not it has any. The bitmask survives only where it is still true: a
+   * pre-2021 HA, which is exactly the case that reports no colour modes.
+   *
+   * @param {Object} entity
+   * @returns {{brightness: boolean, colorTemp: boolean, color: boolean}}
+   */
+  function lightCaps(entity) {
+    var attr  = entity.attributes || {};
+    var modes = attr.supported_color_modes || [];
+
+    if (!modes.length) {
+      var sf = attr.supported_features || 0;
+      return {
+        brightness: (sf & 1) !== 0,
+        colorTemp:  (sf & 2) !== 0,
+        color:      (sf & 16) !== 0
+      };
+    }
+
+    function has(m) { return modes.indexOf(m) !== -1; }
+    var color     = has('hs') || has('xy') || has('rgb') || has('rgbw') || has('rgbww');
+    var colorTemp = has('color_temp') || has('rgbww');
+    return {
+      /* 'onoff' is the only mode with no dimming at all; every other one
+         implies brightness. */
+      brightness: color || colorTemp || has('brightness') || has('white'),
+      colorTemp:  colorTemp,
+      color:      color
+    };
+  }
+
+  /**
+   * Colour-temperature range in Kelvin.
+   *
+   * HA has reported Kelvin since 2022.11 and the mired attributes are
+   * deprecated. The UI always *printed* Kelvin but converted back to mireds
+   * to drive the control, which is where the inverted axis came from: a
+   * higher mired is a LOWER Kelvin, so the slider ran backwards against its
+   * own cool-to-warm gradient. Reading Kelvin directly removes both the
+   * conversion and the inversion. Mireds stay as the fallback, and invert
+   * when they do — min mireds is the max Kelvin.
+   *
+   * @param {Object} attr — entity.attributes
+   * @returns {{min: number, max: number}}
+   */
+  function ctRangeKelvin(attr) {
+    var min = attr.min_color_temp_kelvin;
+    var max = attr.max_color_temp_kelvin;
+    if (min == null && attr.max_mireds) min = miredToKelvin(attr.max_mireds);
+    if (max == null && attr.min_mireds) max = miredToKelvin(attr.min_mireds);
+    return { min: min || 2000, max: max || 6500 };
+  }
+
+  /**
+   * The light's current colour temperature in Kelvin, or null when it is
+   * not in colour-temperature mode.
+   *
+   * @param {Object} attr
+   * @returns {number|null}
+   */
+  function ctCurrentKelvin(attr) {
+    if (attr.color_temp_kelvin != null) return attr.color_temp_kelvin;
+    if (attr.color_temp != null) return miredToKelvin(attr.color_temp);
+    return null;
   }
 
   /* ── color conversion helpers ───────────────────────── */
@@ -626,25 +970,40 @@ if (pinReady) {
     var ctx = canvas.getContext('2d');
     var W = canvas.width, cx = W/2, cy = W/2, r = W/2 - 2;
     ctx.clearRect(0, 0, W, W);
-    // Render wheel pixel-by-pixel via imageData
-    var imageData = ctx.createImageData(W, W);
-    var data = imageData.data;
-    for (var y = 0; y < W; y++) {
-      for (var x = 0; x < W; x++) {
-        var dx = x - cx, dy = y - cy;
-        var dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist > r) { continue; }
-        var hue = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
-        var sat2 = dist / r;
-        var rgb2 = hsvToRgb(hue/360, sat2, 1);
-        var idx = (y * W + x) * 4;
-        data[idx]   = rgb2[0];
-        data[idx+1] = rgb2[1];
-        data[idx+2] = rgb2[2];
-        data[idx+3] = 255;
-      }
+
+    /* Hue as wedges, saturation as one white radial gradient over them.
+       This replaces a hand-written raster: the old version ran atan2, sqrt
+       and an HSV->RGB conversion for each of 57,600 pixels and pushed a
+       230KB buffer through putImageData — on the main thread, synchronously,
+       from inside the sheet's open path, so the slide-up stuttered the first
+       time anyone opened it each session. Now it is 360 native fills and one
+       gradient.
+
+       The gradient is not an approximation. At V=1, HSV saturation s gives
+       white*(1-s) + hue*s, and s is the normalised distance from the centre
+       — which is exactly a white overlay whose alpha falls linearly from 1
+       at the middle to 0 at the rim. */
+    var STEPS = 360;
+    var step  = (Math.PI * 2) / STEPS;
+    for (var i = 0; i < STEPS; i++) {
+      var rgb2 = hsvToRgb(i / STEPS, 1, 1);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      /* Overrun into the next wedge: butted edges leave antialiasing seams
+         radiating out of the centre. */
+      ctx.arc(cx, cy, r, i * step, (i + 1.6) * step);
+      ctx.closePath();
+      ctx.fillStyle = 'rgb(' + rgb2[0] + ',' + rgb2[1] + ',' + rgb2[2] + ')';
+      ctx.fill();
     }
-    ctx.putImageData(imageData, 0, 0);
+
+    var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
     // dark border
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, 2*Math.PI);
@@ -668,8 +1027,167 @@ if (pinReady) {
     cursor.style.top  = y + 'px';
   }
 
+  /* ── light sheet ────────────────────────────────────────
+     The only place brightness, colour temperature and colour can be set,
+     so it is worth the room it takes. What it is not is a form: every
+     control below is a drag surface the size of a thumb with the common
+     values one tap away, because this runs on a panel someone touches in
+     passing, not on a phone held at reading distance.
+     ─────────────────────────────────────────────────────── */
+
+  /* One gesture must not become one request per touchmove, and must not
+     wait for the finger to stop either. 120ms tracks a drag closely enough
+     to read as live while holding HA to ~8 calls a second at worst. The
+     trailing debounce this replaces waited 300ms after the LAST move, so a
+     slow continuous drag sent nothing at all until it ended. */
+  var DRAG_THROTTLE_MS = 120;
+
+  /**
+   * A sender that fires at most once per DRAG_THROTTLE_MS while a gesture
+   * runs, then once more when it ends. Shared by the bars and the colour
+   * wheel so everything tracks the finger at the same rate.
+   *
+   * @param {Function} fn — receives the most recent value
+   */
+  function makeThrottledSend(fn) {
+    var lastSent = 0, pending = null, timer = null;
+
+    function flush() {
+      timer = null;
+      if (pending === null) return;
+      var v = pending;
+      pending = null;
+      lastSent = Date.now();
+      fn(v);
+    }
+
+    return {
+      push: function (v) {
+        var wait = DRAG_THROTTLE_MS - (Date.now() - lastSent);
+        pending = v;
+        if (wait <= 0) { flush(); return; }
+        if (!timer) timer = setTimeout(flush, wait);
+      },
+      commit: function (v) {
+        if (timer) { clearTimeout(timer); timer = null; }
+        pending = null;
+        lastSent = Date.now();
+        fn(v);
+      }
+    };
+  }
+
+  /**
+   * Make the whole of `el` a horizontal drag surface.
+   *
+   * A tap anywhere jumps to that value; a drag follows the finger. touchmove
+   * is cancelled while dragging, without which the vertical component of a
+   * drag scrolls the sheet under the finger — the failure that made the old
+   * 4px range feel broken even on the rare touch that hit it.
+   *
+   * @param {HTMLElement} el
+   * @param {Function} onPaint — (fraction 0..1) every move, local only
+   * @param {Function} onSend  — (fraction 0..1) throttled, plus once on release
+   */
+  function bindDragBar(el, onPaint, onSend) {
+    var dragging = false;
+    var lastX = 0;
+    var sender = makeThrottledSend(onSend);
+
+    function fractionAt(clientX) {
+      var rect = el.getBoundingClientRect();
+      if (!rect.width) return 0;
+      var f = (clientX - rect.left) / rect.width;
+      return f < 0 ? 0 : (f > 1 ? 1 : f);
+    }
+
+    function start(x) {
+      dragging = true;
+      el.classList.add('is-dragging');
+      var f = fractionAt(x);
+      onPaint(f);
+      sender.push(f);
+    }
+
+    function move(x) {
+      if (!dragging) return;
+      var f = fractionAt(x);
+      onPaint(f);
+      sender.push(f);
+    }
+
+    function end(x) {
+      if (!dragging) return;
+      dragging = false;
+      el.classList.remove('is-dragging');
+      var f = fractionAt(x);
+      onPaint(f);
+      sender.commit(f);
+    }
+
+    el.addEventListener('touchstart', function (e) {
+      if (!e.touches.length) return;
+      if (e.cancelable) e.preventDefault();
+      lastX = e.touches[0].clientX;
+      start(lastX);
+    }, false);
+
+    el.addEventListener('touchmove', function (e) {
+      if (!dragging || !e.touches.length) return;
+      if (e.cancelable) e.preventDefault();
+      lastX = e.touches[0].clientX;
+      move(lastX);
+    }, false);
+
+    el.addEventListener('touchend', function (e) {
+      if (e.changedTouches && e.changedTouches.length) {
+        lastX = e.changedTouches[0].clientX;
+      }
+      end(lastX);
+    }, false);
+
+    el.addEventListener('touchcancel', function () { end(lastX); }, false);
+
+    /* Mouse path: desktop and the visual suite. Move/up go on document so a
+       drag that leaves the bar still tracks and still releases. */
+    el.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      lastX = e.clientX;
+      start(lastX);
+    }, false);
+    document.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      lastX = e.clientX;
+      move(lastX);
+    }, false);
+    document.addEventListener('mouseup', function (e) {
+      if (!dragging) return;
+      lastX = e.clientX;
+      end(lastX);
+    }, false);
+  }
+
+  /* ── presets ─────────────────────────────────────────
+     Chosen so the common case never needs a drag. The colour set is spread
+     round the wheel at high saturation, plus one warm white — the shade
+     people actually want from a colour bulb and the hardest to hit on a
+     wheel, since it sits almost dead centre. */
+  var CT_PRESETS = [
+    { k: 2700, label: 'Warm' },
+    { k: 4000, label: 'Neutral' },
+    { k: 5500, label: 'Cool' }
+  ];
+
+  var COLOR_PRESETS = [
+    { h: 0,   s: 100 }, { h: 25,  s: 100 }, { h: 45,  s: 95 },
+    { h: 90,  s: 85 },  { h: 145, s: 85 },  { h: 190, s: 90 },
+    { h: 225, s: 95 },  { h: 275, s: 85 },  { h: 320, s: 80 },
+    { h: 30,  s: 25 }
+  ];
+
   /* ── light sheet open/close ─────────────────────────── */
-  var _sliderBrTimer, _sliderCtTimer, _colorSendTimer;
+  var sheetCaps = { brightness: false, colorTemp: false, color: false };
+  var sheetMode = 'white';
 
   function openLightSheet(entity) {
     if (window._isDeviceLocked(entity.entity_id)) {
@@ -679,66 +1197,198 @@ if (pinReady) {
     doOpenLightSheet(entity);
   }
 
+  /**
+   * Push the entity's current state onto every tile showing it.
+   *
+   * The sheet used to write the new brightness into the entity object and
+   * stop there, so a tile could read "on · 45% · 2700K" for up to a poll
+   * interval after the user had already changed it. Both copies of a tile —
+   * the tab's and the Home widget's — carry the same data-eid.
+   *
+   * @param {Object} entity
+   */
+  function syncCardsFor(entity) {
+    var cards = document.querySelectorAll('[data-eid="' + entity.entity_id + '"]');
+    for (var i = 0; i < cards.length; i++) syncCardFromEntity(cards[i], entity);
+  }
+
+  /** Reflect state on the power row, without touching the light. */
+  function paintSheetPower(on) {
+    var tog = $('sheet-power-toggle');
+    if (on) tog.classList.add('on'); else tog.classList.remove('on');
+    $('sheet-power-label').textContent = on ? 'On' : 'Off';
+  }
+
+  /**
+   * A change that implies the light is on should say so immediately, rather
+   * than leaving the sheet reading "Off" while the bulb is visibly lit.
+   *
+   * @param {Object} entity
+   */
+  function markOnLocally(entity) {
+    if (entity.state === 'on') return;
+    entity.state = 'on';
+    paintSheetPower(true);
+  }
+
+  function paintBrightness(fraction) {
+    $('fill-brightness').style.width = (fraction * 100) + '%';
+    var pct = Math.max(1, Math.round(fraction * 100));
+    $('val-brightness').textContent = pct + '%';
+    $('bar-brightness').setAttribute('aria-valuenow', pct);
+  }
+
+  function paintColorTemp(fraction, kelvin) {
+    $('knob-colortemp').style.left = (fraction * 100) + '%';
+    $('val-colortemp').textContent = kelvin + 'K';
+    $('bar-colortemp').setAttribute('aria-valuenow', kelvin);
+  }
+
+  function paintColorValue(hue, sat) {
+    var rgb = hsToRgb(hue, sat);
+    $('val-color').textContent = rgbToHex(rgb[0], rgb[1], rgb[2]);
+  }
+
+  /** Show only the section the current mode owns. */
+  function applySheetMode() {
+    var both = sheetCaps.colorTemp && sheetCaps.color;
+    $('ctrl-mode').style.display = both ? '' : 'none';
+
+    var showCt    = sheetCaps.colorTemp && (!both || sheetMode === 'white');
+    var showColor = sheetCaps.color     && (!both || sheetMode === 'color');
+    $('ctrl-colortemp').style.display = showCt ? '' : 'none';
+    $('ctrl-color').style.display     = showColor ? '' : 'none';
+
+    var btns = $('seg-mode').getElementsByTagName('button');
+    for (var i = 0; i < btns.length; i++) {
+      var isOn = btns[i].getAttribute('data-mode') === sheetMode;
+      if (isOn) btns[i].classList.add('is-on'); else btns[i].classList.remove('is-on');
+    }
+  }
+
+  /* A preset just outside the light's range is clamped to the end of it
+     rather than dropped. The bulb in the fixture is warmest at 2702K, and a
+     strict test hid the "Warm" chip from it — the one chip that exists to
+     reach exactly that end of exactly that light. Beyond the slack the
+     preset is genuinely unreachable and is dropped. */
+  var CT_PRESET_SLACK = 400;
+
+  /** Colour-temperature chips, clamped to what this light can reach. */
+  function buildCtChips(range) {
+    var wrap = $('chips-ct');
+    wrap.innerHTML = '';
+    for (var i = 0; i < CT_PRESETS.length; i++) {
+      (function (preset) {
+        if (preset.k < range.min - CT_PRESET_SLACK) return;
+        if (preset.k > range.max + CT_PRESET_SLACK) return;
+        var k = Math.min(range.max, Math.max(range.min, preset.k));
+        var b = make('button', 'sheet-chip', preset.label);
+        b.type = 'button';
+        b.setAttribute('data-k', k);
+        bindTap(b, function () { setColorTemp(k, true); });
+        wrap.appendChild(b);
+      })(CT_PRESETS[i]);
+    }
+  }
+
+  /* Built once: the set does not depend on the light. */
+  (function buildSwatches() {
+    var wrap = $('color-swatches');
+    for (var i = 0; i < COLOR_PRESETS.length; i++) {
+      (function (preset) {
+        var rgb = hsToRgb(preset.h, preset.s);
+        var b = make('button', 'sheet-swatch');
+        b.type = 'button';
+        b.style.background = rgbToHex(rgb[0], rgb[1], rgb[2]);
+        b.setAttribute('data-h', preset.h);
+        b.setAttribute('data-s', preset.s);
+        b.setAttribute('aria-label', 'Colour ' + rgbToHex(rgb[0], rgb[1], rgb[2]));
+        bindTap(b, function () { setColor(preset.h, preset.s, true); });
+        wrap.appendChild(b);
+      })(COLOR_PRESETS[i]);
+    }
+  })();
+
+  /**
+   * Mark whichever presets match the light's current state.
+   *
+   * @param {Object} entity
+   */
+  function refreshChipStates(entity) {
+    var attr = entity.attributes || {};
+
+    /* Same fallback the bar paints with. HA reports brightness: null while
+       a light is off, and reading that as "no match" left the bar showing
+       100% with no chip marked — two controls disagreeing about one
+       unknown value. */
+    var pct = attr.brightness != null ? Math.round(attr.brightness / 255 * 100) : 100;
+    var bChips = document.querySelectorAll('#ctrl-brightness .sheet-chip');
+    for (var i = 0; i < bChips.length; i++) {
+      var target = parseInt(bChips[i].getAttribute('data-pct'), 10);
+      if (Math.abs(target - pct) <= 2) bChips[i].classList.add('is-on');
+      else bChips[i].classList.remove('is-on');
+    }
+
+    var k = ctCurrentKelvin(attr);
+    var cChips = $('chips-ct').getElementsByTagName('button');
+    for (var j = 0; j < cChips.length; j++) {
+      var kt = parseInt(cChips[j].getAttribute('data-k'), 10);
+      if (k != null && !attr.hs_color && Math.abs(kt - k) <= 100) cChips[j].classList.add('is-on');
+      else cChips[j].classList.remove('is-on');
+    }
+
+    var hs = attr.hs_color;
+    var sw = $('color-swatches').getElementsByTagName('button');
+    for (var m = 0; m < sw.length; m++) {
+      var sh = parseInt(sw[m].getAttribute('data-h'), 10);
+      var ss = parseInt(sw[m].getAttribute('data-s'), 10);
+      if (hs && Math.abs(sh - hs[0]) <= 8 && Math.abs(ss - hs[1]) <= 8) sw[m].classList.add('is-on');
+      else sw[m].classList.remove('is-on');
+    }
+  }
+
   function doOpenLightSheet(entity) {
     state.sheet.entity = entity;
     state.sheet.open = true;
 
     var caps = lightCaps(entity);
     var attr = entity.attributes || {};
-    var on   = entity.state === 'on';
+    sheetCaps = caps;
 
-    // title
     $('sheet-title').textContent = friendlyName(entity);
-
-    // power
-    var tog = $('sheet-power-toggle');
-    on ? tog.classList.add('on') : tog.classList.remove('on');
-    $('sheet-power-label').textContent = on ? 'Acceso' : 'Spento';
-
-    // dot color
+    paintSheetPower(entity.state === 'on');
     updateSheetDot(entity);
 
-    // brightness
-    var bCtrl = $('ctrl-brightness');
+    $('ctrl-brightness').style.display = caps.brightness ? '' : 'none';
     if (caps.brightness) {
-      bCtrl.style.display = '';
-      var bVal = attr.brightness || 255;
-      $('slider-brightness').value = bVal;
-      $('val-brightness').textContent = Math.round(bVal / 255 * 100) + '%';
-    } else {
-      bCtrl.style.display = 'none';
+      paintBrightness((attr.brightness != null ? attr.brightness : 255) / 255);
     }
 
-    // color temp
-    var ctCtrl = $('ctrl-colortemp');
     if (caps.colorTemp) {
-      ctCtrl.style.display = '';
-      var ctMin = attr.min_mireds || 153;
-      var ctMax = attr.max_mireds || 500;
-      var ctVal = attr.color_temp || ctMin;
-      var slider = $('slider-colortemp');
-      slider.min   = ctMin;
-      slider.max   = ctMax;
-      slider.value = ctVal;
-      $('val-colortemp').textContent = miredToKelvin(ctVal) + 'K';
-    } else {
-      ctCtrl.style.display = 'none';
+      var range = ctRangeKelvin(attr);
+      state.sheet.ctRange = range;
+      buildCtChips(range);
+      var k = ctCurrentKelvin(attr);
+      if (k == null) k = range.min;
+      if (k < range.min) k = range.min;
+      if (k > range.max) k = range.max;
+      paintColorTemp((k - range.min) / (range.max - range.min), k);
     }
 
-    // color wheel
-    var colCtrl = $('ctrl-color');
     if (caps.color) {
-      colCtrl.style.display = '';
-      if (!wheelDrawn) drawColorWheel();
       var hs = attr.hs_color || [0, 0];
-      positionColorCursor(hs[0], hs[1]);
-      var rgb = hsToRgb(hs[0], hs[1]);
-      $('val-color').textContent = rgbToHex(rgb[0], rgb[1], rgb[2]);
-    } else {
-      colCtrl.style.display = 'none';
+      paintColorValue(hs[0], hs[1]);
+      /* Folded away on every open: the wheel's raster is the one expensive
+         thing in this sheet, and most sessions never need it. */
+      $('ctrl-color-wheel').classList.add('hidden');
+      $('btn-color-wheel').setAttribute('aria-expanded', 'false');
     }
 
-    // show
+    /* Land on whatever the light is actually doing. */
+    sheetMode = (caps.color && attr.hs_color) ? 'color' : (caps.colorTemp ? 'white' : 'color');
+    applySheetMode();
+    refreshChipStates(entity);
+
     var bd = $('light-sheet-backdrop');
     bd.style.display = 'block';
     void bd.offsetWidth;
@@ -748,6 +1398,10 @@ if (pinReady) {
 
   function closeLightSheet() {
     state.sheet.open = false;
+    var entity = state.sheet.entity;
+    /* Leave the tiles agreeing with the sheet the user just used, rather
+       than waiting for the next poll to catch them up. */
+    if (entity) syncCardsFor(entity);
     var bd = $('light-sheet-backdrop');
     bd.classList.remove('open');
     $('light-sheet').classList.remove('open');
@@ -760,11 +1414,11 @@ if (pinReady) {
     var attr = entity.attributes || {};
     var dot  = $('sheet-color-dot');
     if (entity.state !== 'on') { dot.style.background = '#2a2a50'; return; }
+    var k;
     if (attr.hs_color) {
       var rgb = hsToRgb(attr.hs_color[0], attr.hs_color[1]);
       dot.style.background = rgbToHex(rgb[0], rgb[1], rgb[2]);
-    } else if (attr.color_temp) {
-      var k = miredToKelvin(attr.color_temp);
+    } else if ((k = ctCurrentKelvin(attr)) != null) {
       var rgb2 = kelvinToRgb(k);
       dot.style.background = rgbToHex(rgb2[0], rgb2[1], rgb2[2]);
     } else if (attr.brightness) {
@@ -775,144 +1429,272 @@ if (pinReady) {
     }
   }
 
+  /* ── applying a change ──────────────────────────────────
+     Colour temperature and colour are mutually exclusive on the server, so
+     setting one clears the other locally too. Without that the sheet kept
+     showing both, and updateSheetDot — which reads hs_color first — went on
+     painting the old colour after a temperature change until a poll
+     corrected it.
+     ─────────────────────────────────────────────────────── */
+
+  function setBrightness(value255, commit) {
+    var entity = state.sheet.entity;
+    if (!entity) return;
+    entity.attributes = entity.attributes || {};
+    entity.attributes.brightness = value255;
+    markOnLocally(entity);
+    updateSheetDot(entity);
+    if (commit) { refreshChipStates(entity); syncCardsFor(entity); }
+    callService('light', 'turn_on',
+      { entity_id: entity.entity_id, brightness: value255 }, function () {});
+  }
+
+  function setColorTemp(kelvin, commit) {
+    var entity = state.sheet.entity;
+    if (!entity) return;
+    var attr = entity.attributes = entity.attributes || {};
+    attr.color_temp_kelvin = kelvin;
+    attr.color_temp = Math.round(1000000 / kelvin);
+    delete attr.hs_color;
+    delete attr.rgb_color;
+    markOnLocally(entity);
+    updateSheetDot(entity);
+
+    var range = state.sheet.ctRange || ctRangeKelvin(attr);
+    paintColorTemp((kelvin - range.min) / (range.max - range.min), kelvin);
+    if (commit) { refreshChipStates(entity); syncCardsFor(entity); }
+
+    /* Kelvin where HA offers it; mireds only for a server too old to. */
+    var data = { entity_id: entity.entity_id };
+    if (attr.min_color_temp_kelvin != null || attr.max_color_temp_kelvin != null) {
+      data.color_temp_kelvin = kelvin;
+    } else {
+      data.color_temp = attr.color_temp;
+    }
+    callService('light', 'turn_on', data, function () {});
+  }
+
+  function setColor(hue, sat, commit) {
+    var entity = state.sheet.entity;
+    if (!entity) return;
+    var attr = entity.attributes = entity.attributes || {};
+    attr.hs_color = [hue, sat];
+    delete attr.color_temp;
+    delete attr.color_temp_kelvin;
+    markOnLocally(entity);
+    updateSheetDot(entity);
+    paintColorValue(hue, sat);
+    if (commit) { refreshChipStates(entity); syncCardsFor(entity); }
+    callService('light', 'turn_on', {
+      entity_id: entity.entity_id,
+      hs_color: [Math.round(hue), Math.round(sat)]
+    }, function () {});
+  }
+
   /* ── sheet interactions ─────────────────────────────── */
-  $('sheet-close').addEventListener('click', closeLightSheet);
+  bindTap($('sheet-close'), closeLightSheet);
   $('light-sheet-backdrop').addEventListener('click', function (e) {
     if (e.target === $('light-sheet-backdrop')) closeLightSheet();
   });
 
-  // power toggle in sheet
-  $('sheet-power-toggle').addEventListener('click', function () {
+  bindTap($('sheet-power-toggle'), function () {
     var entity = state.sheet.entity;
     if (!entity) return;
-    if (state.toggling[entity.entity_id]) return;
+    if (isInFlight(entity.entity_id)) return;
 
     var wasOn = entity.state === 'on';
-    var tog   = $('sheet-power-toggle');
-    state.toggling[entity.entity_id] = true;
-
-    // optimistic
-    wasOn ? tog.classList.remove('on') : tog.classList.add('on');
-    $('sheet-power-label').textContent = wasOn ? 'Spento' : 'Acceso';
     entity.state = wasOn ? 'off' : 'on';
+    markPending(entity.entity_id, entity.state);
+
+    paintSheetPower(!wasOn);
     updateSheetDot(entity);
+    syncCardsFor(entity);
 
-    // update grid card too
-    var card = document.querySelector('[data-eid="' + entity.entity_id + '"]');
-    if (card) {
-      var stext = card.querySelector('.card-state');
-      setCardState(card, stext, !wasOn);
-    }
-
-    callService('light', wasOn ? 'turn_off' : 'turn_on', { entity_id: entity.entity_id }, function(err){
-      setTimeout(function () {
-        delete state.toggling[entity.entity_id];
+    callService('light', wasOn ? 'turn_off' : 'turn_on',
+      { entity_id: entity.entity_id }, function (err) {
+        var pending = state.toggling[entity.entity_id];
+        if (pending) pending.inFlight = false;
         if (err) {
+          delete state.toggling[entity.entity_id];
           entity.state = wasOn ? 'on' : 'off';
-          wasOn ? tog.classList.add('on') : tog.classList.remove('on');
-          $('sheet-power-label').textContent = wasOn ? 'Acceso' : 'Spento';
+          paintSheetPower(wasOn);
+          updateSheetDot(entity);
+          syncCardsFor(entity);
           toast('Error: ' + err);
         }
-      }, 500);
+      });
+  });
+
+  bindDragBar($('bar-brightness'),
+    function (f) { paintBrightness(f); },
+    function (f) { setBrightness(Math.max(1, Math.round(f * 255)), true); });
+
+  bindDragBar($('bar-colortemp'),
+    function (f) {
+      var r = state.sheet.ctRange || { min: 2000, max: 6500 };
+      paintColorTemp(f, Math.round((r.min + f * (r.max - r.min)) / 50) * 50);
+    },
+    function (f) {
+      var r = state.sheet.ctRange || { min: 2000, max: 6500 };
+      setColorTemp(Math.round((r.min + f * (r.max - r.min)) / 50) * 50, true);
     });
-  });
 
-  // brightness slider
-  $('slider-brightness').addEventListener('input', function () {
-    var v = parseInt(this.value, 10);
-    $('val-brightness').textContent = Math.round(v / 255 * 100) + '%';
-    clearTimeout(_sliderBrTimer);
-    var val = v;
-    _sliderBrTimer = setTimeout(function () {
+  var bChipEls = document.querySelectorAll('#ctrl-brightness .sheet-chip');
+  for (var bc = 0; bc < bChipEls.length; bc++) {
+    (function (chip) {
+      bindTap(chip, function () {
+        var pct = parseInt(chip.getAttribute('data-pct'), 10);
+        paintBrightness(pct / 100);
+        setBrightness(Math.max(1, Math.round(pct / 100 * 255)), true);
+      });
+    })(bChipEls[bc]);
+  }
+
+  var segBtns = $('seg-mode').getElementsByTagName('button');
+  for (var sb = 0; sb < segBtns.length; sb++) {
+    (function (btn) {
+      bindTap(btn, function () {
+        sheetMode = btn.getAttribute('data-mode');
+        applySheetMode();
+      });
+    })(segBtns[sb]);
+  }
+
+  /* The wheel's 57,600-pixel raster runs on first reveal instead of on
+     open, so it can no longer stutter the slide-up of a sheet most people
+     open only to dim a light. */
+  bindTap($('btn-color-wheel'), function () {
+    var btn  = $('btn-color-wheel');
+    var wrap = $('ctrl-color-wheel');
+    var opening = wrap.classList.contains('hidden');
+    if (opening) {
+      if (!wheelDrawn) drawColorWheel();
+      wrap.classList.remove('hidden');
       var entity = state.sheet.entity;
-      if (!entity) return;
-      if (entity.state !== 'on') {
-        entity.state = 'on';
-        $('sheet-power-toggle').classList.add('on');
-        $('sheet-power-label').textContent = 'Acceso';
-        var card2 = document.querySelector('[data-eid="' + entity.entity_id + '"]');
-        if (card2) { var st2 = card2.querySelector('.card-state'); setCardState(card2, st2, true); }
-      }
-      entity.attributes = entity.attributes || {};
-      entity.attributes.brightness = val;
-      callService('light', 'turn_on', { entity_id: entity.entity_id, brightness: val }, function(){});
-    }, 300);
+      var hs = (entity && entity.attributes && entity.attributes.hs_color) || [0, 0];
+      positionColorCursor(hs[0], hs[1]);
+    } else {
+      wrap.classList.add('hidden');
+    }
+    btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
   });
 
-  // color temp slider
-  $('slider-colortemp').addEventListener('input', function () {
-    var v = parseInt(this.value, 10);
-    $('val-colortemp').textContent = miredToKelvin(v) + 'K';
-    clearTimeout(_sliderCtTimer);
-    var val = v;
-    _sliderCtTimer = setTimeout(function () {
-      var entity = state.sheet.entity;
-      if (!entity) return;
-      entity.attributes = entity.attributes || {};
-      entity.attributes.color_temp = val;
-      updateSheetDot(entity);
-      callService('light', 'turn_on', { entity_id: entity.entity_id, color_temp: val }, function(){});
-    }, 300);
-  });
+  /* ── drag to dismiss ────────────────────────────────────
+     The sheet has always drawn a grab handle, and the handle has always
+     done nothing — which on a touch panel is worse than drawing none:
+     people pull it and the sheet ignores them.
 
-  // color wheel interaction
-  function handleWheelEvent(e) {
-    e.preventDefault();
-    var canvas = $('light-color-canvas');
-    var rect   = canvas.getBoundingClientRect();
-    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    var x  = clientX - rect.left;
-    var y  = clientY - rect.top;
-    var cx = canvas.width / 2, cy = canvas.height / 2;
-    // scale from display to canvas coords
-    var scaleX = canvas.width  / rect.width;
-    var scaleY = canvas.height / rect.height;
-    var dx = (x - rect.width/2)  * scaleX;
-    var dy = (y - rect.height/2) * scaleY;
-    var dist = Math.sqrt(dx*dx + dy*dy);
-    var r    = canvas.width / 2 - 2;
-    if (dist > r) { dist = r; }
-    var hue = ((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360;
-    var sat = dist / r * 100;
+     Bound to the grip strip only, never to the sheet body. The body
+     scrolls, so a downward drag there is already spoken for, and a handler
+     that had to guess between "scroll the sheet" and "dismiss the sheet"
+     would get it wrong regularly.
+     ─────────────────────────────────────────────────────── */
+  (function bindSheetDismiss() {
+    var sheet = $('light-sheet');
+    var grip  = $('sheet-grip');
+    if (!sheet || !grip) return;
 
-    positionColorCursor(hue, sat);
-    var rgb = hsToRgb(hue, sat);
-    $('val-color').textContent = rgbToHex(rgb[0], rgb[1], rgb[2]);
+    var DISMISS_PX = 90;
+    var y0 = 0, dy = 0, dragging = false;
 
-    // update dot
-    var entity = state.sheet.entity;
-    if (entity) {
-      entity.attributes = entity.attributes || {};
-      entity.attributes.hs_color = [hue, sat];
-      updateSheetDot(entity);
+    function setOffset(px) {
+      sheet.style.webkitTransform = 'translateY(' + px + 'px)';
+      sheet.style.transform = 'translateY(' + px + 'px)';
     }
 
-    clearTimeout(_colorSendTimer);
-    var h2 = hue, s2 = sat;
-    _colorSendTimer = setTimeout(function () {
-      if (!entity) return;
-      if (entity.state !== 'on') {
-        entity.state = 'on';
-        $('sheet-power-toggle').classList.add('on');
-        $('sheet-power-label').textContent = 'Acceso';
-      }
-      callService('light', 'turn_on', {
-        entity_id: entity.entity_id,
-        hs_color: [Math.round(h2), Math.round(s2)]
-      }, function(){});
-    }, 250);
+    /* Hand the transform back to the stylesheet. Whatever it resolves to —
+       translateY(0) for a spring-back, translateY(100%) once .open is gone
+       for a dismiss — the restored transition animates to it. */
+    function release() {
+      sheet.classList.remove('is-dragging');
+      sheet.style.webkitTransform = '';
+      sheet.style.transform = '';
+    }
+
+    grip.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      dragging = true;
+      dy = 0;
+      y0 = e.touches[0].clientY;
+      sheet.classList.add('is-dragging');
+    }, false);
+
+    grip.addEventListener('touchmove', function (e) {
+      if (!dragging || !e.touches.length) return;
+      if (e.cancelable) e.preventDefault();
+      dy = e.touches[0].clientY - y0;
+      /* Downward only: pulling up must not lift the sheet off the edge it
+         is anchored to. */
+      setOffset(dy > 0 ? dy : 0);
+    }, false);
+
+    grip.addEventListener('touchend', function () {
+      if (!dragging) return;
+      dragging = false;
+      var dismiss = dy > DISMISS_PX;
+      release();
+      if (dismiss) closeLightSheet();
+    }, false);
+
+    grip.addEventListener('touchcancel', function () {
+      if (!dragging) return;
+      dragging = false;
+      release();
+    }, false);
+  })();
+
+  /* ── colour wheel interaction ───────────────────────── */
+  var wheelSender = makeThrottledSend(function (hs) { setColor(hs[0], hs[1], false); });
+
+  function wheelHsAt(e) {
+    var canvas = $('light-color-canvas');
+    var rect   = canvas.getBoundingClientRect();
+    var clientX = e.touches && e.touches.length ? e.touches[0].clientX : e.clientX;
+    var clientY = e.touches && e.touches.length ? e.touches[0].clientY : e.clientY;
+    var scaleX = canvas.width  / rect.width;
+    var scaleY = canvas.height / rect.height;
+    var dx = (clientX - rect.left - rect.width  / 2) * scaleX;
+    var dy = (clientY - rect.top  - rect.height / 2) * scaleY;
+    var r    = canvas.width / 2 - 2;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > r) dist = r;
+    return [((Math.atan2(dy, dx) * 180 / Math.PI) + 360) % 360, dist / r * 100];
+  }
+
+  function handleWheelEvent(e, commit) {
+    if (e.cancelable) e.preventDefault();
+    var hs = wheelHsAt(e);
+    positionColorCursor(hs[0], hs[1]);
+    paintColorValue(hs[0], hs[1]);
+    if (commit) {
+      wheelSender.commit(hs);
+      var entity = state.sheet.entity;
+      if (entity) { refreshChipStates(entity); syncCardsFor(entity); }
+    } else {
+      wheelSender.push(hs);
+    }
   }
 
   var canvas = $('light-color-canvas');
   var _wheelDragging = false;
-  canvas.addEventListener('mousedown',  function(e){ _wheelDragging = true; handleWheelEvent(e); });
-  canvas.addEventListener('mousemove',  function(e){ if(_wheelDragging) handleWheelEvent(e); });
-  document.addEventListener('mouseup',  function(){ _wheelDragging = false; });
-  canvas.addEventListener('touchstart', function(e){ handleWheelEvent(e); }, false);
-  canvas.addEventListener('touchmove',  function(e){ handleWheelEvent(e); }, false);
-  canvas.addEventListener('touchend',   function(){ /* chiude il gesto */ }, false);
-  canvas.addEventListener('touchcancel', function(){ clearTimeout(_colorSendTimer); }, false);
+  canvas.addEventListener('mousedown', function (e) {
+    _wheelDragging = true; handleWheelEvent(e, false);
+  });
+  canvas.addEventListener('mousemove', function (e) {
+    if (_wheelDragging) handleWheelEvent(e, false);
+  });
+  document.addEventListener('mouseup', function (e) {
+    if (!_wheelDragging) return;
+    _wheelDragging = false;
+    handleWheelEvent(e, true);
+  });
+  canvas.addEventListener('touchstart', function (e) { handleWheelEvent(e, false); }, false);
+  canvas.addEventListener('touchmove',  function (e) { handleWheelEvent(e, false); }, false);
+  canvas.addEventListener('touchend',   function (e) { handleWheelEvent(e, true); }, false);
+  canvas.addEventListener('touchcancel', function () {
+    var entity = state.sheet.entity;
+    if (entity) syncCardsFor(entity);
+  }, false);
 
   /* ── HA service call ────────────────────────────────── */
   function callService(domain, service, serviceData, cb) {
@@ -950,16 +1732,68 @@ if (pinReady) {
     }
   }
 
+  /* device-card--split is structural, not state: it is decided once, when
+     the tile is built, by whether the tile has the two inner buttons. But
+     className is rewritten wholesale on every poll and every toggle, so it
+     has to be carried across or light tiles get their card padding back on
+     the first sync and jump a row taller. */
+  function baseCardClass(card) {
+    return 'device-card' +
+      (card.classList.contains('device-card--split') ? ' device-card--split' : '');
+  }
+
+  /**
+   * Everything about an entity that changes how its tile renders — which is
+   * exactly what syncCardFromEntity writes, and nothing else. Compared
+   * against what the tile was last built or synced from, so a poll carrying
+   * no news does no DOM work at all.
+   *
+   * This is worth more than it looks. The poll runs every 15 seconds,
+   * forever, on a panel that is otherwise perfectly static, and it used to
+   * rewrite the className, two inline styles and the state text on EVERY
+   * tile on every tick whether or not anything had moved — a full style
+   * recalc across the grid plus, for any light showing a colour, a gradient
+   * repaint. That was a visible hitch every 15 seconds.
+   *
+   * @param {Object} entity
+   * @returns {string}
+   */
+  function tileSignature(entity) {
+    var a = entity.attributes || {};
+    var k = a.color_temp_kelvin != null ? a.color_temp_kelvin
+          : (a.color_temp != null ? a.color_temp : '');
+    return entity.state +
+      '|' + (a.brightness != null ? a.brightness : '') +
+      '|' + k +
+      '|' + (a.hs_color ? a.hs_color[0] + ',' + a.hs_color[1] : '');
+  }
+
   function syncCardFromEntity(card, entity) {
     var eid = entity.entity_id;
-    if (state.toggling[eid]) return;
+
+    var pending = state.toggling[eid];
+    if (pending) {
+      /* Take the report once it agrees with what was asked for, or once
+         waiting has stopped being reasonable — a device that never obeys
+         must not leave the tile lying about it indefinitely. */
+      if (entity.state === pending.expect || Date.now() > pending.until) {
+        delete state.toggling[eid];
+      } else {
+        return;
+      }
+    }
+
+    var sig = tileSignature(entity);
+    if (card.getAttribute('data-sig') === sig) return;
+    card.setAttribute('data-sig', sig);
 
     var on = isOn(entity);
     var unavail = entity.state === 'unavailable';
     var domain = domainOf(eid);
     var isLight = domain === 'light';
 
-    card.className = 'device-card' + (on ? ' on' : '') + (unavail ? ' unavail' : '');
+    card.className = baseCardClass(card) + (on ? ' on' : '') + (unavail ? ' unavail' : '');
+    setPressed(card, on);
 
     if (isLight && on) applyCardColor(card, entity);
     else if (isLight) {
@@ -1061,7 +1895,7 @@ if (pinReady) {
       hasAny = true;
       container.appendChild(make('div', 'section-label', grp.label));
       var grid = make('div', 'devices-grid');
-      for (var k = 0; k < items.length; k++) grid.appendChild(makeCard(items[k]));
+      for (var k = 0; k < items.length; k++) grid.appendChild(buildDeviceTile(items[k]));
       container.appendChild(grid);
     }
     if (!hasAny) {
@@ -1071,8 +1905,22 @@ if (pinReady) {
     }
   }
 
-  /* ── device card ────────────────────────────────────── */
-  function makeCard(entity) {
+  /* ── device tile ──────────────────────────────────────
+     The one builder for both places a device tile appears: the Smart Home
+     tab, and the Smart Home widget on the Home screen. widgets.js used to
+     keep a near-copy kept in step by hand through three window globals, and
+     the two had already drifted — only this one had the in-flight toggle
+     guard, the busy state, the rollback on a failed call and the colour
+     tint for a light that is on with a colour. It lives here because
+     everything it needs already does: state.toggling, callService,
+     applyCardColor and the light sheet are all this module's.
+     ─────────────────────────────────────────────────────── */
+
+  /**
+   * @param {Object} entity — an HA state object
+   * @returns {HTMLElement} a fully wired .device-card
+   */
+  function buildDeviceTile(entity) {
     var on      = isOn(entity);
     var unavail = entity.state === 'unavailable';
     var domain  = domainOf(entity.entity_id);
@@ -1080,11 +1928,15 @@ if (pinReady) {
 
     var card = make('div', 'device-card' + (on ? ' on' : '') + (unavail ? ' unavail' : ''));
     card.setAttribute('data-eid', entity.entity_id);
+    /* Seed the comparison the poll will make, or the first tick after a
+       render rewrites every tile it just built. */
+    card.setAttribute('data-sig', tileSignature(entity));
 
     // apply color hint for lights that are on with color
     if (isLight && on) applyCardColor(card, entity);
 
-    var ico   = make('div', 'card-icon', ICONS[domain] || '◈');
+    var ico   = make('div', 'card-icon');
+    ico.innerHTML = iconMarkup(domain);
     var info  = make('div', 'card-info');
     var name  = make('div', 'card-name', friendlyName(entity));
     var stext = make('div', 'card-state', buildStateText(entity));
@@ -1101,15 +1953,21 @@ if (pinReady) {
       left.appendChild(iconWrap);
       left.appendChild(info);
 
-      var right = make('button', 'light-detail-open', '›');
+      var right = make('button', 'light-detail-open');
       right.type = 'button';
+      right.innerHTML = CHEVRON_ICON;
+      right.setAttribute('aria-label', 'Light settings');
+      /* The buttons carry the padding; the card must not add its own on
+         top, or the tile grows taller and narrower than its neighbours. */
+      card.className += ' device-card--split';
 
-      left.addEventListener('click', function (ev) {
+      left.setAttribute('aria-pressed', on ? 'true' : 'false');
+      bindTap(left, function (ev) {
         ev.stopPropagation();
-        toggleLightFromCard(entity, card, stext, left, right);
+        toggleLightFromCard(entity, card, stext);
       });
 
-      right.addEventListener('click', function (ev) {
+      bindTap(right, function (ev) {
         ev.stopPropagation();
         openLightSheet(entity);
       });
@@ -1122,15 +1980,37 @@ if (pinReady) {
       card.appendChild(info);
     }
 
-    if (!unavail) {
-      card.addEventListener('click', function () {
-        if (isLight) {
-          return;
-        } else {
-          toggleEntity(entity, card, stext);
-        }
-      });
+    /* A light routes through the two buttons above; anything else is one
+       target across the whole tile — and, since that tile is a div, one
+       that has to be given the role and the keyboard by hand. */
+    if (!unavail && !isLight) {
+      card.setAttribute('aria-pressed', on ? 'true' : 'false');
+      bindButtonRole(card, function () { toggleEntity(entity, card, stext); });
     }
+    return card;
+  }
+
+  /**
+   * Placeholder for an entity pinned to the Home screen that HA has not
+   * reported. The slot is kept so the grid does not reflow when the entity
+   * comes back.
+   *
+   * @param {string} [id] — entity_id. May be missing from a hand-edited
+   *   home_widgets entry, which must still render rather than throw.
+   * @param {string} [label]
+   * @returns {HTMLElement}
+   */
+  function buildGhostTile(id, label) {
+    var card = make('div', 'device-card unavail');
+    var ico  = make('div', 'card-icon');
+    /* The id alone picks the right shape, so a pinned-but-unreported device
+       keeps its identity instead of collapsing to a generic mark. */
+    ico.innerHTML = iconMarkup(id ? domainOf(id) : '');
+    card.appendChild(ico);
+    var info = make('div', 'card-info');
+    info.appendChild(make('div', 'card-name', label || id || 'Unknown device'));
+    info.appendChild(make('div', 'card-state', stateLabel('unavailable')));
+    card.appendChild(info);
     return card;
   }
 
@@ -1140,20 +2020,31 @@ if (pinReady) {
     if (entity.state === 'on' && domainOf(entity.entity_id) === 'light') {
       var parts = [];
       if (attr.brightness != null) parts.push(Math.round(attr.brightness / 255 * 100) + '%');
-      if (attr.color_temp != null && !attr.hs_color) parts.push(miredToKelvin(attr.color_temp) + 'K');
+      /* Read the same Kelvin the sheet writes, rather than reconverting
+         from the deprecated mired attribute the sheet no longer relies on. */
+      var k = ctCurrentKelvin(attr);
+      if (k != null && !attr.hs_color) parts.push(k + 'K');
       if (parts.length) return base + ' · ' + parts.join(' · ');
     }
     return base;
   }
 
-  /* Shared with the Home widget so a tile reads the same on both tabs,
-     and so a poll-driven sync never rewrites it in a different format
-     than the initial build used. */
-  window._haStateText = buildStateText;
-  /* Same reasoning for the icon map and name formatter: this module owns
-     the canonical copy, other modules read it instead of keeping their
-     own (which is how the icon map and friendlyName drifted apart before). */
-  window._haIcons = ICONS;
+  /* The Home widget asks for a tile instead of rebuilding one, so the state
+     text, the icon set and the chevron no longer need publishing at all —
+     the three shims that kept two renderers agreeing went with the second
+     renderer. What is still shared is what other MODULES need: the Settings
+     tab draws the same icons and names in its device-protection list. */
+  /**
+   * The live entity snapshot. Exposed because a widget rendered before the
+   * first HA response captures an empty list, and an action bound then has
+   * to be able to ask again later rather than trust what it closed over.
+   *
+   * @returns {Array<Object>}
+   */
+  window._haEntitySnapshot = function () { return state.entities || []; };
+  window._haDeviceTile = buildDeviceTile;
+  window._haGhostTile  = buildGhostTile;
+  window._haIconMarkup = iconMarkup;
   window._haFriendlyName = friendlyName;
 
   function applyCardColor(card, entity) {
@@ -1175,7 +2066,7 @@ if (pinReady) {
   /* ── non-light toggle ───────────────────────────────── */
   function toggleEntity(entity, card, stateEl) {
     var eid = entity.entity_id;
-    if (state.toggling[eid]) return;
+    if (isInFlight(eid)) return;
     if (window._isDeviceLocked(eid)) {
       window._guardDeviceAction(eid, function () { doToggleEntity(entity, card, stateEl); });
       return;
@@ -1187,73 +2078,165 @@ if (pinReady) {
     var eid = entity.entity_id;
     var wasOn  = card.classList.contains('on');
     var domain = domainOf(eid);
-    setCardState(card, stateEl, !wasOn);
-    state.toggling[eid] = true;
-    card.classList.add('busy');
-    callService(domain, svcFor(domain, !wasOn), { entity_id: eid }, function (err) {
-      setTimeout(function () {
+    var nextOn = !wasOn;
+
+    setCardState(card, stateEl, nextOn);
+    entity.state = nextOn ? 'on' : 'off';
+    markPending(eid, entity.state);
+    var clearBusy = busyAfterDelay(card);
+
+    callService(domain, svcFor(domain, nextOn), { entity_id: eid }, function (err) {
+      clearBusy();
+      var pending = state.toggling[eid];
+      if (pending) pending.inFlight = false;
+      if (err) {
         delete state.toggling[eid];
-        card.classList.remove('busy');
-        if (err) { setCardState(card, stateEl, wasOn); toast('Error: ' + err); }
-        else { entity.state = !wasOn ? 'on' : 'off'; }
-      }, 500);
+        entity.state = wasOn ? 'on' : 'off';
+        setCardState(card, stateEl, wasOn);
+        toast('Error: ' + err);
+      }
     });
   }
 
-  function toggleLightFromCard(entity, card, stateEl, leftBtn, rightBtn) {
+  function toggleLightFromCard(entity, card, stateEl) {
     var eid = entity.entity_id;
-    if (state.toggling[eid]) return;
+    if (isInFlight(eid)) return;
     if (window._isDeviceLocked(eid)) {
       window._guardDeviceAction(eid, function () {
-        doToggleLightFromCard(entity, card, stateEl, leftBtn, rightBtn);
+        doToggleLightFromCard(entity, card, stateEl);
       });
       return;
     }
-    doToggleLightFromCard(entity, card, stateEl, leftBtn, rightBtn);
+    doToggleLightFromCard(entity, card, stateEl);
   }
 
-  function doToggleLightFromCard(entity, card, stateEl, leftBtn, rightBtn) {
-    var eid = entity.entity_id;
+  /** Paint the colour tint a light that is on should carry, or clear it. */
+  function paintLightTint(card, entity, on) {
+    if (on) { applyCardColor(card, entity); return; }
+    card.style.background = '';
+    card.style.borderColor = '';
+  }
 
+  function doToggleLightFromCard(entity, card, stateEl) {
+    var eid = entity.entity_id;
     var wasOn = entity.state === 'on';
     var nextOn = !wasOn;
 
     entity.state = nextOn ? 'on' : 'off';
     setCardState(card, stateEl, nextOn);
-    if (nextOn) applyCardColor(card, entity);
-    else {
-      card.style.background = '';
-      card.style.borderColor = '';
-    }
+    paintLightTint(card, entity, nextOn);
 
-    state.toggling[eid] = true;
-    card.classList.add('busy');
-    leftBtn.disabled = true;
-    rightBtn.disabled = true;
+    markPending(eid, entity.state);
+    /* The buttons are no longer disabled while the call is out: the
+       in-flight guard already refuses a second tap, and `disabled` also
+       greyed them out, which made a tap look like it had broken the very
+       control it just used. The rule that greyed them is gone too. */
+    var clearBusy = busyAfterDelay(card);
 
     callService('light', nextOn ? 'turn_on' : 'turn_off', { entity_id: eid }, function (err) {
-      setTimeout(function () {
+      clearBusy();
+      var pending = state.toggling[eid];
+      if (pending) pending.inFlight = false;
+      if (err) {
         delete state.toggling[eid];
-        card.classList.remove('busy');
-        leftBtn.disabled = false;
-        rightBtn.disabled = false;
-
-        if (err) {
-          entity.state = wasOn ? 'on' : 'off';
-          setCardState(card, stateEl, wasOn);
-          if (wasOn) applyCardColor(card, entity);
-          else {
-            card.style.background = '';
-            card.style.borderColor = '';
-          }
-          toast('Error: ' + err);
-        }
-      }, 500);
+        entity.state = wasOn ? 'on' : 'off';
+        setCardState(card, stateEl, wasOn);
+        paintLightTint(card, entity, wasOn);
+        toast('Error: ' + err);
+      }
     });
   }
 
+  /* ── switch everything off ──────────────────────────────
+     Shared by the Smart Home tab and the Home widget. It takes the
+     candidate entities rather than deciding them, because the two callers
+     legitimately mean different sets: the tab acts on everything it shows,
+     the widget only on what is pinned to the Home screen. Passing the list
+     makes that difference explicit instead of hiding it in here.
+
+     It lives in this module for the same reason the tile builder does —
+     domainOf, isOn, callService and toast are all local, where widgets.js
+     had to reach for every one of them through a window global.
+     ─────────────────────────────────────────────────────── */
+
+  /**
+   * Switch off every device in `list` that is currently on.
+   *
+   * PIN-locked devices are handled separately and deliberately: firing the
+   * guard per entity would stack one prompt per locked device, so the locked
+   * ones are collected and gated behind a single prompt. The PIN is still
+   * required; only the number of prompts changes.
+   *
+   * @param {Array<Object>} list — candidate entities
+   */
+  function allOff(list) {
+    var open = [], locked = [];
+    for (var k = 0; k < list.length; k++) {
+      var e = list[k];
+      if (!e || !isOn(e) || e.state === 'unavailable') continue;
+      if (window._isDeviceLocked(e.entity_id)) locked.push(e);
+      else open.push(e);
+    }
+
+    if (!open.length && !locked.length) {
+      toast('Everything is already off');
+      return;
+    }
+
+    /**
+     * One call per distinct service, not one per device: HA takes an array
+     * of entity ids, and the backend's protection check reads entity_id in
+     * string, array and target form, so batching cannot slip a locked
+     * device past the PIN.
+     *
+     * The loop this replaced fired N POSTs and put a full /api/ha/devices
+     * refetch in each one's callback: eight devices meant eight service
+     * calls and — minus whatever the in-flight flag happened to swallow —
+     * several complete reloads of every entity, each followed by a sync
+     * pass over the whole grid.
+     *
+     * @param {Array<Object>} group
+     */
+    function turnOff(group) {
+      var byService = {}, keys = [];
+      for (var j = 0; j < group.length; j++) {
+        var domain  = domainOf(group[j].entity_id);
+        var service = svcFor(domain, false);
+        var key     = domain + '.' + service;
+        if (!byService[key]) {
+          byService[key] = { domain: domain, service: service, ids: [] };
+          keys.push(key);
+        }
+        byService[key].ids.push(group[j].entity_id);
+      }
+
+      var pending = keys.length;
+      if (!pending) return;
+
+      for (var i = 0; i < keys.length; i++) {
+        callService(byService[keys[i]].domain, byService[keys[i]].service,
+          { entity_id: byService[keys[i]].ids }, function () {
+            pending--;
+            /* One refresh, once everything has been asked to switch off. */
+            if (pending === 0) refreshHADevices({ silent: true });
+          });
+      }
+    }
+
+    turnOff(open);
+
+    if (locked.length) {
+      window._openPinPrompt('devices', 'Locked devices',
+        'Enter the PIN to turn off ' + locked.length +
+        (locked.length === 1 ? ' locked device.' : ' locked devices.'),
+        function () { turnOff(locked); });
+    }
+  }
+  window._haAllOff = allOff;
+
   function setCardState(card, stateEl, on) {
     if (on) card.classList.add('on'); else card.classList.remove('on');
+    setPressed(card, on);
     if (stateEl) stateEl.textContent = stateLabel(on ? 'on' : 'off');
   }
 
@@ -1443,9 +2426,17 @@ if (pinReady) {
     setTimeout(function () { btn.classList.remove('is-busy'); }, 600);
   }
 
-  $('smarthome-refresh-btn').addEventListener('click', function () {
+  bindTap($('smarthome-refresh-btn'), function () {
     pulseRefreshBtn('smarthome-refresh-btn');
     refreshHADevices({ silent: true });
+  });
+
+  /* The tab shows every relevant entity, so its "everything" is everything
+     it shows. The Home widget passes the pinned subset to the same
+     function — see window._haAllOff. */
+  bindTap($('smarthome-alloff-btn'), function () {
+    pulseRefreshBtn('smarthome-alloff-btn');
+    allOff(state.entities || []);
   });
 
   /* ── background poll (interval from backend config) ─── */
@@ -2801,6 +3792,19 @@ if (pinReady) {
     currentItem: null
   };
 
+  /* Missing-poster mark. Drawn, not typed: it was ◈ U+25C8, a Geometric
+     Shapes codepoint with no guaranteed cover in the iOS 9.3 system fonts —
+     and a placeholder that itself falls back to tofu is worse than the gap
+     it was put there to fill. Same convention as ACTION_ICONS in
+     widgets.js: nothing has to exist in the device's fonts. */
+  var JF_NO_POSTER =
+    '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true" ' +
+    'focusable="false" stroke="currentColor" stroke-width="1.6" ' +
+    'stroke-linecap="round" stroke-linejoin="round">' +
+    '<rect x="3" y="4.5" width="18" height="15" rx="2"/>' +
+    '<circle cx="8.8" cy="10" r="1.6"/>' +
+    '<path d="M4 17.5l4.8-4.3 3.4 3 3-2.6 4.8 4.2"/></svg>';
+
   /* ── helpers (local) ────────────────────────────────── */
   function $j(id) { return document.getElementById(id); }
 
@@ -2935,13 +3939,14 @@ if (pinReady) {
         var targetH = Math.round(cardW * 1.5 * dpr);
         img.src = '/api/jf/image/' + item.Id + '?type=Primary&maxH=' + targetH;
       img.onerror = function () {
-        this.parentNode.innerHTML = '<div class="jelly-card-poster-placeholder">◈</div>';
+        this.parentNode.innerHTML =
+          '<div class="jelly-card-poster-placeholder">' + JF_NO_POSTER + '</div>';
       };
       posterWrap.appendChild(img);
     } else {
       var ph = document.createElement('div');
       ph.className = 'jelly-card-poster-placeholder';
-      ph.textContent = '◈';
+      ph.innerHTML = JF_NO_POSTER;
       posterWrap.appendChild(ph);
     }
 
@@ -3221,6 +4226,34 @@ if (pinReady) {
     pollTimer:   null,
     charts:      {},     // chartist instances keyed by id
     loaded:      false
+  };
+
+  /* ── action-button icons ────────────────────────────────
+     Drawn, not typed. This row carried ⏻ U+23FB for Shutdown, which is
+     Unicode 9.0 — newer than the device — so on the panel it resolved to
+     nothing at all: the button that shuts a VM down showed only its label.
+     widgets.js documents the exact same problem and fixed it for the Home
+     card's header actions; this row was missed. The rest of the row is
+     converted with it, since one drawn icon in a line of glyphs would sit
+     at a visibly different weight.
+     ───────────────────────────────────────────────────── */
+  function pxIcon(body, filled) {
+    return '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" ' +
+           'focusable="false" ' +
+           (filled
+             ? 'fill="currentColor" stroke="none"'
+             : 'fill="none" stroke="currentColor" stroke-width="2" ' +
+               'stroke-linecap="round" stroke-linejoin="round"') +
+           '>' + body + '</svg>';
+  }
+
+  var PX_ICONS = {
+    play:    pxIcon('<path d="M9 6l9 6-9 6V6z"/>', true),
+    stop:    pxIcon('<rect x="7" y="7" width="10" height="10" rx="1.5"/>', true),
+    pause:   pxIcon('<path d="M9.5 6v12M14.5 6v12"/>'),
+    power:   pxIcon('<path d="M12 3v8"/><path d="M17.2 6.3a7.5 7.5 0 1 1-10.4 0"/>'),
+    reset:   pxIcon('<path d="M4 12a8 8 0 1 0 2.34-5.66"/><path d="M4 4v4.5h4.5"/>'),
+    console: pxIcon('<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M8.5 20h7"/>')
   };
 
   /* ── helpers ────────────────────────────────────────── */
@@ -3528,20 +4561,20 @@ if (pinReady) {
       // Actions
       html += '<div class="px-actions">';
       if (!running && !paused)
-        html += '<button class="px-action-btn start"    data-vm-action="start">▶ Avvia</button>';
+        html += '<button class="px-action-btn start"    data-vm-action="start">' + PX_ICONS.play + 'Avvia</button>';
       if (running)
-        html += '<button class="px-action-btn shutdown" data-vm-action="shutdown">⏻ Shutdown</button>';
+        html += '<button class="px-action-btn shutdown" data-vm-action="shutdown">' + PX_ICONS.power + 'Shutdown</button>';
       if (running)
-        html += '<button class="px-action-btn stop"     data-vm-action="stop">■ Stop</button>';
+        html += '<button class="px-action-btn stop"     data-vm-action="stop">' + PX_ICONS.stop + 'Stop</button>';
       if (running)
-        html += '<button class="px-action-btn suspend"  data-vm-action="suspend">⏸ Sospendi</button>';
+        html += '<button class="px-action-btn suspend"  data-vm-action="suspend">' + PX_ICONS.pause + 'Sospendi</button>';
       if (paused)
-        html += '<button class="px-action-btn start"    data-vm-action="resume">▶ Riprendi</button>';
+        html += '<button class="px-action-btn start"    data-vm-action="resume">' + PX_ICONS.play + 'Riprendi</button>';
       if (running || paused)
-        html += '<button class="px-action-btn reset"    data-vm-action="reset">↺ Reset</button>';
+        html += '<button class="px-action-btn reset"    data-vm-action="reset">' + PX_ICONS.reset + 'Reset</button>';
       /* VNC console — only available for QEMU VMs, not LXC containers */
       if (vmType === 'qemu')
-        html += '<button class="px-action-btn vnc" data-vm-vnc="1">⬡ Console VNC</button>';
+        html += '<button class="px-action-btn vnc" data-vm-vnc="1">' + PX_ICONS.console + 'Console VNC</button>';
       html += '</div>';
 
       // Stats
@@ -4154,12 +5187,16 @@ if (pinReady) {
       }
       list.dataset.loaded = '1';
 
+      /* No icon per group any more: the row draws the icon for its own
+         entity's domain, which is both more accurate — 'switches' spans two
+         domains — and the last copy of a glyph set that had four. The '⌁'
+         these carried is U+2301, absent from the iOS 9.3 system fonts. */
       var HA_GROUPS = [
-        { key: 'lights',   label: 'Lights',      domains: ['light'],                      icon: '○' },
-        { key: 'media',    label: 'Media',        domains: ['media_player'],               icon: '▷' },
-        { key: 'switches', label: 'Smart Plug',   domains: ['switch','input_boolean'],     icon: '⌁' },
-        { key: 'climate',  label: 'Climate',      domains: ['climate','fan'],              icon: '◇' },
-        { key: 'covers',   label: 'Covers',       domains: ['cover'],                      icon: '▭' }
+        { key: 'lights',   label: 'Lights',      domains: ['light'] },
+        { key: 'media',    label: 'Media',       domains: ['media_player'] },
+        { key: 'switches', label: 'Smart Plug',  domains: ['switch', 'input_boolean'] },
+        { key: 'climate',  label: 'Climate',     domains: ['climate', 'fan'] },
+        { key: 'covers',   label: 'Covers',      domains: ['cover'] }
       ];
 
       function domainOf(eid) { return eid.split('.')[0]; }
@@ -4181,7 +5218,7 @@ if (pinReady) {
         list.appendChild(glbl);
 
         for (var k = 0; k < items.length; k++) {
-          (function (entity, icon) {
+          (function (entity) {
             var name = friendlyName(entity);
             var row  = document.createElement('div');
             row.className = 'feat-widget-item';
@@ -4190,8 +5227,8 @@ if (pinReady) {
             var left = document.createElement('div');
             left.className = 'feat-widget-item-left';
             var ic = document.createElement('span');
-            ic.className = 'feat-widget-item-icon';
-            ic.textContent = icon;
+            ic.className = 'feat-widget-item-icon feat-widget-item-icon--svg';
+            ic.innerHTML = window._haIconMarkup(domainOf(entity.entity_id));
             var nm = document.createElement('span');
             nm.className = 'feat-widget-item-name';
             nm.textContent = name;
@@ -4200,7 +5237,7 @@ if (pinReady) {
             row.appendChild(left);
             row.appendChild(makeAddBtn('smarthome', entity.entity_id, name));
             list.appendChild(row);
-          })(items[k], grp.icon);
+          })(items[k]);
         }
       }
       if (!hasAny) {
@@ -4257,8 +5294,11 @@ if (pinReady) {
           var left = document.createElement('div');
           left.className = 'feat-widget-item-left';
           var ic = document.createElement('span');
-          ic.className = 'feat-widget-item-icon';
-          ic.textContent = '◬';
+          ic.className = 'feat-widget-item-icon feat-widget-item-icon--svg';
+          /* The markets tab icon, rather than a fifth private glyph: ◬
+             U+25EC has the same doubtful cover as the set already replaced
+             on the device tiles. */
+          ic.innerHTML = window._WIDGETS.icons.markets;
           var nm = document.createElement('span');
           nm.className = 'feat-widget-item-name';
           nm.textContent = item.symbol + (item.name ? ' · ' + item.name : '');
@@ -4383,9 +5423,9 @@ if (pinReady) {
 
   function $d(id) { return document.getElementById(id); }
 
-  /* The top module owns the canonical icon map and friendlyName — it
+  /* The top module owns the canonical icon set and friendlyName — it
      always runs first, so both globals are set by the time this fires. */
-  var ICONS = window._haIcons;
+  var iconMarkup = window._haIconMarkup;
   function domainOf(eid)   { return eid.split('.')[0]; }
   var friendlyName = window._haFriendlyName;
 
@@ -4433,8 +5473,8 @@ if (pinReady) {
         var left = document.createElement('div');
         left.className = 'feat-widget-item-left devlock-item-left';
         var ic = document.createElement('span');
-        ic.className = 'feat-widget-item-icon';
-        ic.textContent = ICONS[domainOf(eid)] || '◈';
+        ic.className = 'feat-widget-item-icon feat-widget-item-icon--svg';
+        ic.innerHTML = iconMarkup(domainOf(eid));
         var nm = document.createElement('span');
         nm.className = 'feat-widget-item-name';
         nm.textContent = friendlyName(entity);
@@ -4860,19 +5900,18 @@ if (pinReady) {
 
   /* A wake from standby is when a stale panel is most likely to
      be looked at, and the cheapest moment to notice. Debounced
-     the same way onAppWake is, since iOS can fire
-     visibilitychange and pageshow for one unlock. */
+     the same way onAppWake is, since onAppVisible can deliver
+     more than one signal for a single unlock. */
   var lastCheckAt = 0;
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) return;
+  window._onAppVisible(function () {
     var now = Date.now();
     if (now - lastCheckAt < WAKE_GAP_MS) return;
     lastCheckAt = now;
     check();
-  }, false);
+  });
 
   setInterval(function () {
-    if (document.hidden) return;
+    if (window._appHidden()) return;
     lastCheckAt = Date.now();
     check();
   }, POLL_MS);
