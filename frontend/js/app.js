@@ -445,33 +445,70 @@ if (pinReady) {
     if (t) t.classList.add('active');
     state.page = id;
     window._currentPage = id;
-    // Load page-specific data if needed
-    if (id === 'smarthome') loadSmartHome(false);
-    if (id === 'settings')  { loadSettings(); loadAdminSettings(); }
     /* Leaving Server stops its background status poller — it has no other
        page-visibility guard, unlike the Home widget scheduler. */
     if (id !== 'server' && window._pxStopPolling) window._pxStopPolling();
+    /* Everything above is the visible switch and costs one style pass.
+       Everything below is data loading. Running both in the same task
+       means WebKit paints only once they are BOTH done, so on the panel's
+       A5 the tab visibly hesitates before it changes. Yielding first lets
+       the new page paint, then loads into it. */
+    setTimeout(function () {
+      if (id === 'smarthome') loadSmartHome(false);
+      if (id === 'settings')  { loadSettings(); loadAdminSettings(); }
+    }, 0);
   }
 
   /* Settings tab gate — uses the 'settings' scope, cached for the page
      session: once unlocked, re-opening Settings doesn't ask again. */
   var settingsUnlocked = false;
 
+  /* ── tab activation ──────────────────────────────────
+     Four other modules (Markets, Weather, Jellyfin, Server) need to know
+     their tab was opened, so they can kick off a first load. They used to
+     get that by listening for `click` on the tab element in the CAPTURE
+     phase — a way of running before the page-switch handler below, which
+     only worked as long as both sides were the same `click`. They register
+     here instead, which says what it means and no longer depends on which
+     event opens a tab. */
+  var tabHooks = {};
+
+  /**
+   * Run cb when a tab is opened, just before its page is shown.
+   * @param {string} id — the tab's data-page value
+   * @param {Function} cb
+   */
+  window._onTabActivate = function (id, cb) {
+    if (!tabHooks[id]) tabHooks[id] = [];
+    tabHooks[id].push(cb);
+  };
+
+  function activateTab(id) {
+    if (id === 'settings' && !settingsUnlocked) {
+      openPinPrompt('settings', 'Settings locked', 'Enter the PIN to access Settings.', function () {
+        settingsUnlocked = true;
+        showPage('settings');
+      });
+      return;
+    }
+    var hooks = tabHooks[id] || [];
+    for (var h = 0; h < hooks.length; h++) hooks[h]();
+    showPage(id);
+    if (id === 'home' && window._homeRefresh) window._homeRefresh();
+  }
+
+  /* bindTap, not `click`: iOS holds a click back ~350ms after the finger
+     lifts, in case a second tap follows and means "zoom". That wait is the
+     whole of the reported lag — the tab dims under the finger, the tap
+     sound plays and finishes, and only then does the page change. The tab
+     bar is fixed and never scrolls, so claiming the release here costs
+     nothing. `touch-action: manipulation` in the CSS reset asks WebKit for
+     the same thing and lands on 9.3, but it is a hint about a heuristic;
+     this is the guarantee. */
   var tabEls = document.querySelectorAll('.tab');
   for (var _ti = 0; _ti < tabEls.length; _ti++) {
     (function (tab) {
-      tab.addEventListener('click', function () {
-        var id = tab.getAttribute('data-page');
-        if (id === 'settings' && !settingsUnlocked) {
-          openPinPrompt('settings', 'Settings locked', 'Enter the PIN to access Settings.', function () {
-            settingsUnlocked = true;
-            showPage('settings');
-          });
-          return;
-        }
-        showPage(id);
-        if (id === 'home' && window._homeRefresh) window._homeRefresh();
-      });
+      bindTap(tab, function () { activateTab(tab.getAttribute('data-page')); });
     })(tabEls[_ti]);
   }
 
@@ -1719,6 +1756,15 @@ if (pinReady) {
     for (var i = 0; i < target.length; i++) index[target[i].entity_id] = target[i];
     for (var j = 0; j < incoming.length; j++) {
       var src = incoming[j];
+      /* The sheet edits its entity in place and sends the change on a
+         throttle, so a poll landing mid-drag would replace the value the
+         finger is still moving with whatever HA last reported. Skipping
+         that one entity is what lets the poll keep running at all while
+         the sheet is open — the blanket "do not poll" it replaces froze
+         the whole grid, so a light switched by an automation elsewhere in
+         the house went unnoticed for as long as the sheet stayed up. */
+      if (state.sheet.open && state.sheet.entity &&
+          state.sheet.entity.entity_id === src.entity_id) continue;
       var dst = index[src.entity_id];
       if (dst) {
         dst.state = src.state;
@@ -2446,7 +2492,6 @@ if (pinReady) {
     if (!intervalSec || intervalSec <= 0) return;
     _haPollTimer = setInterval(function () {
       if (!state.haConnected) return;
-      if (state.sheet.open) return;
       refreshHADevices({ silent: true });
     }, intervalSec * 1000);
   }
@@ -2983,12 +3028,9 @@ if (pinReady) {
     loadFavorites();
   });
 
-  var marketsTab = document.querySelector('[data-page="markets"]');
-  if (marketsTab) {
-    marketsTab.addEventListener('click', function () {
-      loadFavorites();
-    }, true);
-  }
+  window._onTabActivate('markets', function () {
+    loadFavorites();
+  });
 
   /* used by the core module's wake-from-standby handler */
   window._marketsRefresh = loadFavorites;
@@ -3748,9 +3790,9 @@ if (pinReady) {
     loadForecastForLocation(loc, true);
   });
 
-  document.querySelector('[data-page="meteo"]').addEventListener('click', function () {
+  window._onTabActivate('meteo', function () {
     setTimeout(function () { loadWeatherPage(); }, 60);
-  }, true);
+  });
 
   /* used by the core module's wake-from-standby handler */
   window._weatherRefresh = loadWeatherPage;
@@ -4112,18 +4154,16 @@ if (pinReady) {
   });
 
   /* ── hook into page navigation ──────────────────────── */
-  // We patch the global showPage function by wrapping tab clicks
-  var jellyTab = document.querySelector('[data-page="jelly"]');
-  if (jellyTab) {
-    jellyTab.addEventListener('click', function () {
-      // first visit: load
-      if (!jf.userId && !jf.loading) {
-        var loadEl = $j('jelly-loading');
-        loadEl.classList.remove('hidden');
-        loadJelly(true);
-      }
-    }, true); // capture phase — fires before the page switch handler
-  }
+  window._onTabActivate('jelly', function () {
+    // first visit: load
+    if (!jf.userId && !jf.loading) {
+      /* The spinner goes up now, so it is part of the same paint as the
+         page switch; the request that fills it can wait for the tick
+         after, the way Weather and Server already do it. */
+      $j('jelly-loading').classList.remove('hidden');
+      setTimeout(function () { loadJelly(true); }, 60);
+    }
+  });
 
   /* used by the core module's wake-from-standby handler — skip if the
      tab was never visited yet, so waking up doesn't force a first load
@@ -4911,14 +4951,11 @@ if (pinReady) {
   }
 
   /* ── Hook into tab navigation ───────────────────────── */
-  var serverTab = document.querySelector('[data-page="server"]');
-  if (serverTab) {
-    serverTab.addEventListener('click', function () {
-      if (!px.loaded) {
-        setTimeout(loadCluster, 60);
-      }
-    }, true);
-  }
+  window._onTabActivate('server', function () {
+    if (!px.loaded) {
+      setTimeout(loadCluster, 60);
+    }
+  });
 
   /* ── Settings: Proxmox save & test ─────────────────── */
   /* Whether a token secret is already stored. The value never arrives. */

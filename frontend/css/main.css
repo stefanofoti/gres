@@ -1,6 +1,25 @@
 /* ── Reset ──────────────────────────────────────────── */
 * { -webkit-box-sizing: border-box; box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+/* Every tap in this app waits ~350ms on iOS before its `click` arrives:
+   the engine is holding it back to see whether a second tap follows and
+   means "zoom". On the wall panel that is the whole of the app's
+   sluggishness — a control dims under the finger, the tap sound plays and
+   ends, and the action lands a third of a second later.
+
+   `touch-action: manipulation` is the documented opt-out and shipped in
+   iOS 9.3 — the target engine, exactly. It keeps panning and pinch-zoom
+   and gives up only double-tap-zoom, which `user-scalable=no` on the
+   viewport has already disabled. It is not inherited, so it has to be
+   declared on the universal selector rather than on body. Pre-9.3 engines
+   drop the line and behave as before.
+
+   Navigation does not rely on this: the tab bar claims the touch on
+   release itself (bindTap in app.js), as do the device tiles. This is what
+   covers everything else — Settings rows, Jellyfin cards, Proxmox tree
+   rows, the weather day list. */
+* { -ms-touch-action: manipulation; touch-action: manipulation; }
+
 /* ════════════════════════════════════════════════════════
    DESIGN TOKENS — colour
    Derived by clustering the colours this stylesheet actually
@@ -1043,7 +1062,9 @@ html, body {
   min-width: 0;
 }
 .feat-widget-item-left > * + * { margin-left: var(--space-sm); }
-.feat-widget-item-icon { font-size: var(--text-sm); color: var(--text-faint-warm); width: 14px; text-align: center; -webkit-flex-shrink: 0; flex-shrink: 0; }
+/* Every row in these lists draws its icon now, so the base rule carries
+   only what is shared; the size comes from the --svg modifier below. */
+.feat-widget-item-icon { color: var(--text-faint-warm); -webkit-flex-shrink: 0; flex-shrink: 0; }
 /* Same slot, drawn instead of typed. Only the smart-device-protection list
    uses it; the widget-picker rows above still carry their own glyphs, so the
    base rule keeps its font-size. Same specificity — this must stay after. */
@@ -2881,19 +2902,33 @@ html.light .devlock-lock-btn.locked { color: #c98a0a; }
      control and it sat at 32px. */
   width: 2.75rem; height: 2.75rem; min-width: 2.75rem; padding: 0;
   border-radius: var(--radius-sm); border: 1px solid var(--border-accent);
-  background: var(--surface-raised); color: var(--text-muted-accent); line-height: 1;
+  background: var(--surface-raised); color: var(--text-muted-accent);
   cursor: pointer; -webkit-tap-highlight-color: transparent;
-  /* Centres the glyph on its own. This used to depend on a global
-     `line-height: 32px` that lived in the Weather section; the weather
-     refactor removed it, and a fixed line-height would not survive the
-     text-size lever anyway. */
+  /* The icon is centred as INLINE content — `text-align` for the
+     horizontal, `line-height: 0` plus the vertical centring a <button>
+     does for its own content for the vertical. The flex declarations
+     below are not what centres it, and must not be the only thing that
+     does: a <button> is the one element whose flex container Safari 9
+     does not honour the way every other engine does, and it fails
+     silently — the icon simply sits at the left edge on the panel and
+     nowhere else. .wx-icon-btn is the same control built the same way,
+     and it is the one that stayed centred on the device.
+     This replaces an earlier dependency on a global `line-height: 32px`
+     that lived in the Weather section; a fixed px line-height would not
+     survive the text-size lever, and 0 does. */
+  line-height: 0; text-align: center;
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
   -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
 }
 .smarthome-top-actions .btn-icon-only:active { opacity: 0.65; }
 .smarthome-top-actions .btn-icon-only.is-busy { opacity: 0.45; pointer-events: none; }
-.smarthome-top-actions .btn-icon-only > svg { display: block; width: 1.25rem; height: 1.25rem; }
+/* inline-block, not block: `display: block` is what took the icon out of
+   the centred inline flow above and left it hard against the left edge. */
+.smarthome-top-actions .btn-icon-only > svg {
+  display: inline-block; vertical-align: middle;
+  width: 1.25rem; height: 1.25rem;
+}
 
 /* ── Device tiles nested inside a widget ────────────
    On the Smart Home tab .device-card is sized against the full page,

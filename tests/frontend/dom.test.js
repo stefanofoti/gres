@@ -1479,3 +1479,262 @@ describe('device tiles (one renderer for the tab and the widget)', function () {
     });
   });
 });
+
+
+/*
+ * The light sheet had four screenshots and no behavioural coverage at all,
+ * which is the wrong way round for the part of it that is pure logic:
+ * lightCaps decides which controls exist, and it reads attributes whose
+ * meaning Home Assistant has changed underneath it twice. These drive it
+ * through its effect — which controls the sheet actually shows — rather
+ * than reaching for the function, so they keep working if it is rewritten.
+ */
+describe('light sheet', function () {
+  function light(id, attrs, state) {
+    return { entity_id: id, state: state || 'on',
+             attributes: JSON.parse(JSON.stringify(attrs)) };
+  }
+
+  function routes(entities, posts) {
+    return function (method, url, body) {
+      if (method === 'POST' && url.indexOf('/api/ha/service') !== -1) {
+        if (posts) posts.push(JSON.parse(body));
+        return { status: 200, body: { ok: true } };
+      }
+      if (url.indexOf('/api/settings') !== -1 && method === 'GET') {
+        return { status: 200, body: { home_widgets: [] } };
+      }
+      if (url.indexOf('/api/ha/devices') !== -1) {
+        return { status: 200, body: {
+          entities: entities, summary: { total: entities.length, active: 0 } } };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url, body);
+    };
+  }
+
+  /** Open the sheet on `entity` and report which controls it decided to show. */
+  function openOn(entity) {
+    window._openLightSheet(entity);
+    function shown(id) { return document.getElementById(id).style.display !== 'none'; }
+    return {
+      brightness: shown('ctrl-brightness'),
+      colorTemp:  shown('ctrl-colortemp'),
+      color:      shown('ctrl-color'),
+      mode:       shown('ctrl-mode')
+    };
+  }
+
+  test('an on/off light gets no controls it cannot honour', function () {
+    loadApp(routes([]));
+    return flush().then(function () {
+      var c = openOn(light('light.a', { supported_color_modes: ['onoff'] }));
+      expect(c).toEqual({ brightness: false, colorTemp: false, color: false, mode: false });
+    });
+  });
+
+  test('a dimmable light gets brightness only', function () {
+    loadApp(routes([]));
+    return flush().then(function () {
+      var c = openOn(light('light.a', { supported_color_modes: ['brightness'] }));
+      expect(c).toEqual({ brightness: true, colorTemp: false, color: false, mode: false });
+    });
+  });
+
+  test('the White/Colour switch appears only when the light does both', function () {
+    loadApp(routes([]));
+    return flush().then(function () {
+      var ct = openOn(light('light.a', { supported_color_modes: ['color_temp'] }));
+      expect(ct).toEqual({ brightness: true, colorTemp: true, color: false, mode: false });
+
+      var hs = openOn(light('light.b', { supported_color_modes: ['hs'] }));
+      expect(hs).toEqual({ brightness: true, colorTemp: false, color: true, mode: false });
+
+      /* Both, so the two must not be live at once: they are exclusive on
+         the server, and showing them together let each display a value the
+         other had already overwritten. */
+      var both = openOn(light('light.c', { supported_color_modes: ['color_temp', 'hs'] }));
+      expect(both).toEqual({ brightness: true, colorTemp: true, color: false, mode: true });
+    });
+  });
+
+  test('supported_features does not invent colour support on a modern light', function () {
+    loadApp(routes([]));
+    return flush().then(function () {
+      /* 19 = 16+2+1. Those bits once meant COLOR|COLOR_TEMP|BRIGHTNESS and
+         since HA 2021.5 mean nothing of the sort — this light reports only
+         color_temp, and a colour picker on it would control nothing. */
+      var c = openOn(light('light.a', {
+        supported_color_modes: ['color_temp'], supported_features: 19
+      }));
+      expect(c.colorTemp).toBe(true);
+      /* The White/Colour switch is the discriminating signal, not the
+         visibility of the Colour section: the sheet opens on White either
+         way, so the section is hidden whether the capability was inferred
+         or not. The switch exists only when the light really does both. */
+      expect(c.mode).toBe(false);
+    });
+  });
+
+  test('the bitmask still speaks for a server too old to report colour modes', function () {
+    loadApp(routes([]));
+    return flush().then(function () {
+      /* No supported_color_modes at all is the pre-2021.5 shape, and there
+         the bits do mean COLOR|COLOR_TEMP|BRIGHTNESS. */
+      var c = openOn(light('light.a', { supported_features: 19 }));
+      expect(c.brightness).toBe(true);
+      expect(c.colorTemp).toBe(true);
+      /* The switch is the proof of colour support here: the sheet opens on
+         White for a light with no colour set, so the Colour section is
+         hidden until asked for rather than absent. */
+      expect(c.mode).toBe(true);
+
+      var seg = document.getElementById('seg-mode').getElementsByTagName('button');
+      for (var i = 0; i < seg.length; i++) {
+        if (seg[i].getAttribute('data-mode') === 'color') seg[i].click();
+      }
+      expect(document.getElementById('ctrl-color').style.display).not.toBe('none');
+      expect(document.getElementById('ctrl-colortemp').style.display).toBe('none');
+    });
+  });
+
+  test('colour temperature reads Kelvin, and falls back to mireds', function () {
+    loadApp(routes([]));
+    return flush().then(function () {
+      openOn(light('light.a', {
+        supported_color_modes: ['color_temp'],
+        min_color_temp_kelvin: 2702, max_color_temp_kelvin: 6535,
+        color_temp_kelvin: 4000
+      }));
+      expect(document.getElementById('val-colortemp').textContent).toBe('4000K');
+
+      /* Same light described the deprecated way: 1000000/250 == 4000K. */
+      openOn(light('light.b', {
+        supported_color_modes: ['color_temp'],
+        min_mireds: 153, max_mireds: 370, color_temp: 250
+      }));
+      expect(document.getElementById('val-colortemp').textContent).toBe('4000K');
+    });
+  });
+
+  test('the temperature axis runs warm to cool, not backwards', function () {
+    loadApp(routes([]));
+    return flush().then(function () {
+      var attrs = {
+        supported_color_modes: ['color_temp'],
+        min_color_temp_kelvin: 2702, max_color_temp_kelvin: 6535
+      };
+      /* Mireds increase as a light gets warmer, so driving the control from
+         them ran it backwards against its own cool-to-warm gradient. */
+      attrs.color_temp_kelvin = 2702;
+      openOn(light('light.a', attrs));
+      expect(document.getElementById('knob-colortemp').style.left).toBe('0%');
+
+      attrs.color_temp_kelvin = 6535;
+      openOn(light('light.b', attrs));
+      expect(document.getElementById('knob-colortemp').style.left).toBe('100%');
+    });
+  });
+
+  test('a preset just outside the light range is clamped, not dropped', function () {
+    loadApp(routes([]));
+    return flush().then(function () {
+      openOn(light('light.a', {
+        supported_color_modes: ['color_temp'],
+        min_color_temp_kelvin: 2702, max_color_temp_kelvin: 6535
+      }));
+      var chips = document.getElementById('chips-ct').getElementsByTagName('button');
+      var labels = [], warm = null;
+      for (var i = 0; i < chips.length; i++) {
+        labels.push(chips[i].textContent);
+        if (chips[i].textContent === 'Warm') warm = chips[i];
+      }
+      /* The 2700K preset exists to reach this light's warm end, which is
+         2702K. A strict range test hid the one chip that mattered. */
+      expect(labels).toEqual(['Warm', 'Neutral', 'Cool']);
+      expect(warm.getAttribute('data-k')).toBe('2702');
+    });
+  });
+
+  test('dragging the brightness bar sends the value under the finger', function () {
+    var posts = [];
+    loadApp(routes([], posts));
+    return flush().then(function () {
+      openOn(light('light.a', { supported_color_modes: ['brightness'], brightness: 10 }));
+
+      var bar = document.getElementById('bar-brightness');
+      /* jsdom lays nothing out, and the whole point of the control is that
+         the position within the bar IS the value. */
+      bar.getBoundingClientRect = function () {
+        return { left: 0, top: 0, right: 200, bottom: 56, width: 200, height: 56 };
+      };
+
+      var down = new window.MouseEvent('mousedown', { clientX: 100, bubbles: true });
+      bar.dispatchEvent(down);
+      return flush();
+    }).then(function () {
+      expect(posts.length).toBeGreaterThan(0);
+      var last = posts[posts.length - 1];
+      expect(last.domain).toBe('light');
+      expect(last.service).toBe('turn_on');
+      /* Halfway along a 200px bar: round(0.5 * 255). */
+      expect(last.service_data.brightness).toBe(128);
+    });
+  });
+
+  test('a poll keeps the grid live but leaves the open entity alone', function () {
+    var live = [
+      { entity_id: 'light.a', state: 'on',
+        attributes: { friendly_name: 'A', supported_color_modes: ['brightness'], brightness: 10 } },
+      { entity_id: 'light.b', state: 'on',
+        attributes: { friendly_name: 'B', supported_color_modes: ['brightness'], brightness: 10 } }
+    ];
+    loadApp(routes(live));
+
+    return flush().then(function () {
+      document.querySelector('[data-page="smarthome"]').click();
+      return flush();
+    }).then(function () {
+      var a = window._haEntitySnapshot()[0];
+      window._openLightSheet(a);
+      /* Mid-drag: the sheet has set a local value the throttle has not yet
+         confirmed, and HA still reports the old one. */
+      a.attributes.brightness = 200;
+      live[0].attributes.brightness = 10;
+      live[1].attributes.brightness = 99;
+
+      window._refreshHADevices({ silent: true });
+      return flush();
+    }).then(function () {
+      var snap = window._haEntitySnapshot();
+      var byId = {};
+      for (var i = 0; i < snap.length; i++) byId[snap[i].entity_id] = snap[i];
+      expect(byId['light.a'].attributes.brightness).toBe(200);
+      /* Everything else still tracks — freezing the whole grid was the
+         cost the old blanket guard paid for this. */
+      expect(byId['light.b'].attributes.brightness).toBe(99);
+    });
+  });
+
+  test('setting a colour clears the temperature, and the reverse', function () {
+    var posts = [];
+    loadApp(routes([], posts));
+    return flush().then(function () {
+      var e = light('light.a', {
+        supported_color_modes: ['color_temp', 'hs'],
+        min_color_temp_kelvin: 2702, max_color_temp_kelvin: 6535,
+        color_temp_kelvin: 4000
+      });
+      openOn(e);
+
+      document.getElementById('color-swatches').getElementsByTagName('button')[0].click();
+      /* The server treats these as exclusive. Keeping both locally is what
+         left the header dot painting a colour the light no longer had. */
+      expect(e.attributes.hs_color).not.toBeUndefined();
+      expect(e.attributes.color_temp_kelvin).toBeUndefined();
+
+      document.getElementById('chips-ct').getElementsByTagName('button')[0].click();
+      expect(e.attributes.color_temp_kelvin).not.toBeUndefined();
+      expect(e.attributes.hs_color).toBeUndefined();
+    });
+  });
+});

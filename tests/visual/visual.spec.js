@@ -308,6 +308,40 @@ test.describe('overlays', function () {
     await expect(page).toHaveScreenshot('overlay-server-vm-actions.png');
   });
 
+  /* Two lists of drawn icons that no tab shot reaches: the Settings widget
+     picker sits inside a collapsed accordion, and the missing-poster mark
+     only appears for an item Jellyfin has no image for. Both were carrying
+     typographic glyphs until recently, and neither had any coverage — which
+     is exactly how a glyph the device cannot render survives. */
+  test('settings widget picker', async function ({ page }) {
+    await gotoApp(page, { theme: 'dark', fontSize: 'normal' });
+    await openTab(page, 'settings');
+    await page.click('#feat-hdr-smarthome');
+    await page.waitForTimeout(500);
+    await page.locator('#feat-list-smarthome').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await expect(page).toHaveScreenshot('overlay-settings-widget-picker.png');
+  });
+
+  test('jellyfin missing poster', async function ({ page }) {
+    await gotoApp(page, {
+      theme: 'dark', fontSize: 'normal',
+      fixtures: {
+        '/api/jf/items': function (payload) {
+          /* Strip the image tag from the first two so the placeholder sits
+             beside real posters and any size or colour drift shows up. */
+          for (var i = 0; i < 2 && i < payload.items.length; i++) {
+            delete payload.items[i].ImageTags;
+          }
+          return payload;
+        }
+      }
+    });
+    await openTab(page, 'jelly');
+    await page.waitForTimeout(600);
+    await expect(page).toHaveScreenshot('overlay-jellyfin-no-poster.png');
+  });
+
   test('jellyfin detail', async function ({ page }) {
     await gotoApp(page, { theme: 'dark', fontSize: 'normal' });
     await openTab(page, 'jelly');

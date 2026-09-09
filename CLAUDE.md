@@ -14,6 +14,7 @@ Banned in `frontend/`:
 | CSS Grid | iOS 10.3 | flexbox with `calc(N% - gutter)` widths |
 | `clamp()` / `min()` / `max()` | iOS 11.3–13.4 | fixed values per breakpoint |
 | `var()` **inside** `calc()` | buggy in Safari 9.1–11 | a literal `rem`, with a comment noting the coupling |
+| flex centring on a `<button>` | iOS 11 | centre the child as inline content — `line-height: 0` + `text-align: center` on the button, `vertical-align: middle` on the child. A button is the one element whose flex container Safari 9 does not honour; `display: block` on the child then takes it out of the centred inline flow and it sits hard left. Keep the flex declarations, just never let them be the only thing centring it (`.btn-icon-only`, `.wx-icon-btn`) |
 | `object-fit` | iOS 10 | already wrapped in `@supports not (object-fit: cover)` |
 | `env(safe-area-inset-*)` | iOS 11.2 | fine, but a plain fallback **must** be declared first |
 | `document.hidden` / `visibilitychange` | iOS 10.3 | `window._appHidden()` / `window._onAppVisible(cb)` — app.js resolves the `webkit`-prefixed pair once. The unprefixed event never fires on 9.3 and `document.hidden` reads `undefined`, so a `if (document.hidden) return` guard silently stops guarding |
@@ -34,7 +35,7 @@ npm run test:backend         # supertest against the express routes
 npm run test:frontend        # jsdom; includes tests/frontend/es5-compat.test.js
 npx jest -t "name"           # single test by name
 
-npm run test:visual          # playwright screenshot regression (72 shots)
+npm run test:visual          # playwright screenshot regression (74 shots)
 npm run test:visual:update   # re-baseline after an INTENDED visual change
 npm run test:visual:capture  # re-record tests/visual/fixtures from a live backend on :3000
 ```
@@ -53,6 +54,7 @@ There is no module system, so **load order is the dependency graph**: `widgets.j
 
 - `window._xhr(method, url, body, cb)` — the single HTTP entry point (XHR, not fetch). Everything must go through it: this is where the feature-disable gate lives.
 - `window._showPage` / `window._currentPage` — tab routing
+- `window._onTabActivate(pageId, cb)` — modules register here to be told their tab was opened, just before its page is shown. Tabs activate on `touchend` (`bindTap`), not on the `click` iOS holds back ~350ms, so a capture-phase `click` listener on the tab element no longer sees a tab being opened
 - `window._onSettingsLoad(cb)` — modules register here to receive settings on load
 - `window._toast`, `window._openPinPrompt`, `window._guardDeviceAction`, `window._openLightSheet`
 - `window._homeRefresh`, `window._syncHACard`, `window._mergeHAEntities` — Home/Smart-Home state sync
@@ -81,6 +83,8 @@ Three things here are invariants rather than choices, and all three are easy to 
 **`tileSignature(entity)` is the tile's cache key.** The 15-second poll compares it against the tile's `data-sig` and does nothing at all when they match — which is what keeps a panel that is static for hours from doing a style recalc and a gradient repaint every 15 seconds. It must therefore list *everything* `syncCardFromEntity` renders and nothing it doesn't. Render a new attribute on a tile without adding it to the signature and the tile will simply never update for it.
 
 **`state.toggling[eid]` is `{ inFlight, expect, until }`, not a boolean.** `inFlight` blocks a second tap while the request is out; `expect` + `until` stop the poll overwriting an optimistic state until HA agrees or `SETTLE_MS` passes. These were one flat 500ms timer, which is why every tap used to leave a dimmed, dead tile behind it. `.busy` now appears only if a call is still out after `BUSY_AFTER_MS`.
+
+The poll no longer stops while the sheet is open. `mergeEntityStates` skips just the entity the sheet is editing — that one is being changed in place and sent on a throttle, so a poll landing mid-drag would overwrite the value the finger is still moving — and everything else stays live. The blanket guard this replaces froze the whole grid, so a light switched by an automation elsewhere went unnoticed for as long as the sheet stayed up.
 
 **A plain tile is a `div` with `role="button"`, and `bindButtonRole` is what makes that honest.** It adds the role, a `tabindex`, and Enter/Space handling — the last of which is not optional: `role="button"` without a keyboard announces as a button and then refuses to be operated as one. The keyboard half is deliberately *not* in `bindTap`, which is also used on real `<button>`s that already activate on Enter and Space; binding `keydown` there too would fire those handlers twice. `aria-pressed` goes on the tile for a plain device but on the inner `.light-main-toggle` for a light, since a light tile is a div hosting two real buttons and a button may not contain buttons — `pressHost()` picks the right one and `setPressed()` only writes where the attribute already exists, so an offline tile that never had a role does not get a state it cannot honour.
 
@@ -131,7 +135,9 @@ A `:root` token layer (~72 tokens: colour, type, spacing, radius) drives everyth
 
 ### Visual regression harness (`tests/visual/`)
 
-The safety net for CSS work, since there is no build step and no other coverage of rendering. 72 screenshots: 7 tabs across 6 viewports, plus a light-theme and two text-size passes, plus nine states no tab shot reaches (the PIN overlay, the Jellyfin detail, the weather day detail in both themes, the light sheet in four — colour-temperature-only in both themes, colour-capable, and colour-capable with the wheel disclosed — and the Proxmox VM action row for a running QEMU guest, the state in which every button in it appears at once).
+The safety net for CSS work, since there is no build step and no other coverage of rendering. 74 screenshots: 7 tabs across 6 viewports, plus a light-theme and two text-size passes, plus eleven states no tab shot reaches — the PIN overlay, the Jellyfin detail, the weather day detail in both themes, the light sheet in four (colour-temperature-only in both themes, colour-capable, and colour-capable with the wheel disclosed), the Proxmox VM action row for a running QEMU guest (the state in which every button appears at once), the Settings widget picker with an accordion expanded, and a Jellyfin grid with the missing-poster mark beside real posters.
+
+Those last three exist because each is a list of drawn icons that no tab shot could reach — one behind a collapsed accordion, one needing an item Jellyfin has no image for, one needing a VM selected. All three carried typographic glyphs until recently, and the Shutdown button's U+23FB survived unrenderable on the device precisely because nothing looked at it.
 
 A test can serve a state the captured data does not contain by passing `fixtures` to `gotoApp`: a `{ pathname: fn }` map whose function receives the parsed fixture body and returns what to serve instead. It runs *before* the not-captured fallback, so it can also supply a response the fixtures never recorded — the function just receives `{}`. The light-sheet colour shots use it to turn a colour-capable bulb on; the VM action shot uses it to supply a per-VM status, which nothing had ever requested during a capture. It belongs in the spec rather than in the fixture because `capture-fixtures.js` rewrites those files wholesale, so anything hand-added to one is dropped silently at the next capture — the fixture `settings.json` is the deliberate exception, and it is never overwritten.
 
