@@ -146,6 +146,18 @@ Then pick which devices appear on the dashboard: **Settings** →
 3. Server URL **including the port**, e.g. `https://192.168.1.10:8006`
 4. Token ID and secret → **Test connection** → **Save**.
 
+**Privilege separation.** The **Privilege Separation** box in the token
+dialog is ticked by default, and a separated token starts with *no*
+permissions of its own — it never inherits the user's. So granting
+`PVEAuditor` to `user@realm` is not enough: the token stays blind and
+gres reports an empty cluster with a token that tests as valid. Add the
+role to the token itself at **Datacenter** → **Permissions** → **Add** →
+**API Token Permission**, path `/`, token `user@realm!tokenname`, role
+`PVEAuditor` (plus a role carrying `VM.PowerMgmt`, on `/vms` or on `/`, for
+start/stop). Untick the box instead and the token carries the user's
+privileges — simpler, but then the token is as powerful as the account,
+which defeats the point of issuing one for a wall panel.
+
 Proxmox's self-signed certificate is accepted automatically.
 </details>
 
