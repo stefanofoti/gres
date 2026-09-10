@@ -1,6 +1,6 @@
 {
   "name": "gres",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Gres - Lightweight integrated control pane for smart homes",
   "main": "backend/server.js",
   "scripts": {
