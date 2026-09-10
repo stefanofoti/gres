@@ -469,6 +469,96 @@ describe('server-scope guard on Proxmox power actions', function () {
   });
 });
 
+/*
+ * The Proxmox tree is drawn once by renderTree and its status dot is plain
+ * markup from that moment on. Nothing repainted it, so a guest started or
+ * stopped — from the action buttons here, or from the Proxmox UI — kept the
+ * state the cluster had when the tab was first opened, and only a full page
+ * reload put it right. These lock down the two halves of the repaint: the
+ * row can still be found (it needs both data-node and data-vmid), and the
+ * ticker that finds it stops when the tab is left.
+ */
+describe('Proxmox tree status dots stay live', function () {
+  var TICK_MS = 15000;
+
+  /** Route handler over a one-node cluster whose guest states are mutable. */
+  function pxRoutes(guests) {
+    return function (method, url, body) {
+      if (url.indexOf('/api/px/nodes/proxmox/vms') !== -1) {
+        return { status: 200, body: guests };
+      }
+      if (url.indexOf('/api/px/nodes/proxmox/storage') !== -1) {
+        return { status: 200, body: [] };
+      }
+      if (url.indexOf('/api/px/nodes') !== -1) {
+        return { status: 200, body: [{ node: 'proxmox', status: 'online' }] };
+      }
+      return mockXhrHelper.defaultRouteHandler(method, url, body);
+    };
+  }
+
+  function openServerTab() {
+    document.querySelector('[data-page="server"]').click();
+    return flush().then(flush);
+  }
+
+  function dotClassFor(vmid) {
+    var row = document.querySelector(
+      '.px-tree-item[data-node="proxmox"][data-vmid="' + vmid + '"]');
+    return row ? row.querySelector('.px-status-dot').className : null;
+  }
+
+  test('a guest started outside the app repaints its dot on the next tick', function () {
+    var guests = [
+      { vmid: 101, name: 'nas',  _type: 'qemu', status: 'stopped' },
+      { vmid: 102, name: 'dns',  _type: 'lxc',  status: 'running' }
+    ];
+    loadApp(pxRoutes(guests));
+    return flush().then(openServerTab).then(function () {
+      expect(dotClassFor(101)).toBe('px-status-dot stopped');
+
+      /* Started from the Proxmox UI: the app is told nothing. */
+      guests[0].status = 'running';
+      jest.advanceTimersByTime(TICK_MS);
+      return flush();
+    }).then(function () {
+      expect(dotClassFor(101)).toBe('px-status-dot running');
+      /* The meta line under the name is the status word, and went stale
+         with the dot. */
+      var row = document.querySelector('.px-tree-item[data-vmid="101"]');
+      expect(row.querySelector('.px-item-meta').textContent).toBe('running');
+      /* The untouched guest is left where it was. */
+      expect(dotClassFor(102)).toBe('px-status-dot running');
+    });
+  });
+
+  test('leaving the Server tab stops the refresh', function () {
+    var guests = [{ vmid: 101, name: 'nas', _type: 'qemu', status: 'stopped' }];
+    var vmsCalls = 0;
+    var routes = pxRoutes(guests);
+    loadApp(function (method, url, body) {
+      if (url.indexOf('/api/px/nodes/proxmox/vms') !== -1) vmsCalls++;
+      return routes(method, url, body);
+    });
+
+    return flush().then(openServerTab).then(function () {
+      jest.advanceTimersByTime(TICK_MS);
+      return flush();
+    }).then(function () {
+      var before = vmsCalls;
+      expect(before).toBeGreaterThan(1);          /* initial load + a tick */
+
+      document.querySelector('[data-page="home"]').click();
+      jest.advanceTimersByTime(TICK_MS * 4);
+      return flush().then(function () {
+        /* This runs 24/7 on a wall panel: a ticker that outlives the tab
+           polls Proxmox forever for a tree nobody is looking at. */
+        expect(vmsCalls).toBe(before);
+      });
+    });
+  });
+});
+
 describe('appearance module (theme + status bar, persisted via localStorage)', function () {
   test('defaults to dark theme with the status bar visible', function () {
     loadApp();

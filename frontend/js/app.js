@@ -4264,6 +4264,8 @@ if (pinReady) {
     nodes:       [],
     selected:    null,   // { kind:'node'|'vm'|'storage', node, vmid, type, data }
     pollTimer:   null,
+    treeTimer:   null,   // whole-tree status refresh, Server tab only
+    treeBusy:    false,  // a tree refresh is still out
     charts:      {},     // chartist instances keyed by id
     loaded:      false
   };
@@ -4370,6 +4372,11 @@ if (pinReady) {
             vm.name || ('VM ' + vm.vmid),
             vm.status || '—',
             statusClass(vm.status));
+          /* The row has to be findable again after a start or a stop —
+             see setTreeStatus. The node header already carries data-node
+             and no data-vmid, so the two-attribute selector cannot hit it. */
+          vmItem.setAttribute('data-node', node.node);
+          vmItem.setAttribute('data-vmid', vm.vmid);
           vmGroup.appendChild(vmItem);
         }
         tree.appendChild(vmGroup);
@@ -4468,6 +4475,103 @@ if (pinReady) {
     });
 
     return item;
+  }
+
+  /* ── tree status patching ───────────────────────────────
+     renderTree draws the status dot once and it is plain markup from that
+     moment on, so nothing repainted it: a guest started or stopped from
+     here (or from the Proxmox UI) kept the state the cluster had when the
+     tab was first opened, until a reload rebuilt the module. The dot is
+     patched in place rather than through renderTree, which would drop the
+     .selected class and rebind every click handler in the tree.
+     ───────────────────────────────────────────────────── */
+  function setTreeStatus(nodeName, vmid, status) {
+    /* DOM attributes are strings and vmid arrives from JSON as a number,
+       so the selector is built from its string form, and the model lookup
+       below compares loosely for the same reason. */
+    var row = document.querySelector(
+      '.px-tree-item[data-node="' + nodeName + '"][data-vmid="' + vmid + '"]');
+    if (!row) return;
+
+    var dot = row.querySelector('.px-status-dot');
+    if (dot) dot.className = 'px-status-dot ' + statusClass(status);
+
+    /* The meta line under the name is the status word itself, so it went
+       stale with the dot. */
+    var meta = row.querySelector('.px-item-meta');
+    if (meta) meta.textContent = status || '—';
+
+    /* Keep px.nodes in step with what is on screen, or the next renderTree
+       — a Retry, or saved credentials — paints the old state back. */
+    for (var ni = 0; ni < px.nodes.length; ni++) {
+      if (px.nodes[ni].node !== nodeName) continue;
+      var vms = px.nodes[ni]._vms || [];
+      for (var vi = 0; vi < vms.length; vi++) {
+        if (vms[vi].vmid == vmid) { vms[vi].status = status; return; }
+      }
+    }
+  }
+
+  /* Re-reads one node's guest list and patches every dot on it. An action
+     can move more than the guest that was clicked, and this is one request
+     for the whole node rather than one per row. */
+  function refreshNodeTree(nodeName, cb) {
+    pxGet('/nodes/' + nodeName + '/vms', function (err, vms) {
+      if (!err && Array.isArray(vms)) {
+        for (var i = 0; i < vms.length; i++) {
+          setTreeStatus(nodeName, vms[i].vmid, vms[i].status);
+        }
+      }
+      if (cb) cb();
+    });
+  }
+
+  /* ── whole-tree refresh ─────────────────────────────────
+     A guest started from the Proxmox UI, or by a boot order, moves no dot
+     here on its own: the per-VM poll lives inside selectVM and covers only
+     the selected guest, and with nothing selected no timer runs at all.
+     This is that missing tick.
+
+     It only patches the dots of rows that already exist — a guest created
+     or destroyed elsewhere still needs a Retry, because picking that up
+     means renderTree, which drops the .selected class and rebinds every
+     handler in the tree.
+
+     One request per node, each fanning out server-side into qemu + lxc, so
+     the tick is deliberately slower than the detail poll and stops dead
+     when the tab is left (see _pxStopPolling) or the app is backgrounded.
+     ───────────────────────────────────────────────────── */
+  var TREE_REFRESH_MS = 15000;
+
+  function startTreeRefresh() {
+    stopTreeRefresh();
+    px.treeTimer = setInterval(function () {
+      /* loadCluster can finish after the tab was already left, which would
+         start an orphan ticker; it stops itself here, and the tab-activate
+         hook is what starts it again. */
+      if (window._currentPage !== 'server') { stopTreeRefresh(); return; }
+      /* Backgrounded is different: the timer stays, so an unlock resumes
+         it without waiting for anything to re-register it. */
+      if (window._appHidden && window._appHidden()) return;
+      /* Don't stack ticks on top of a PVE that is slow or gone: on a panel
+         that runs for weeks that is how a drip becomes a flood. */
+      if (px.treeBusy) return;
+
+      var pending = px.nodes.length;
+      if (!pending) return;
+      px.treeBusy = true;
+      for (var i = 0; i < px.nodes.length; i++) {
+        refreshNodeTree(px.nodes[i].node, function () {
+          if (--pending <= 0) px.treeBusy = false;
+        });
+      }
+    }, TREE_REFRESH_MS);
+  }
+
+  function stopTreeRefresh() {
+    clearInterval(px.treeTimer);
+    px.treeTimer = null;
+    px.treeBusy  = false;
   }
 
   /* ── SELECT NODE ────────────────────────────────────── */
@@ -4592,6 +4696,11 @@ if (pinReady) {
       var running = status.status === 'running';
       var paused  = status.status === 'paused';
 
+      /* What this pane was drawn for. The poll compares against it to tell
+         a change of state from a change of numbers. */
+      if (px.selected && px.selected.kind === 'vm' && px.selected.vmid == vmid)
+        px.selected.status = status.status;
+
       var html = '';
       html += '<div class="px-detail-header">';
       html += '<div class="px-detail-name">' + escHtml(status.name || ('VM ' + vmid)) + '</div>';
@@ -4701,10 +4810,21 @@ if (pinReady) {
     px.pollTimer = setInterval(function () {
       if (!px.selected || px.selected.kind !== 'vm' || px.selected.vmid != vmid) return;
       pxGet('/nodes/' + nodeName + '/' + vmType + '/' + vmid + '/status', function(err, status) {
-        if (!err && status) {
-          // refresh only stats and action buttons, not whole detail
-          updateVMStats(status, detail);
-        }
+        if (err || !status) return;
+        /* The response can land after the selection moved on — selectVM
+           clears the timer, but not a request already in flight — and
+           writing it into the pane now would label another guest's detail
+           with this one's numbers. */
+        if (!px.selected || px.selected.kind !== 'vm' || px.selected.vmid != vmid) return;
+
+        setTreeStatus(nodeName, vmid, status.status);
+
+        /* A changed state moves more than the numbers: the header line and
+           which action buttons exist at all. patchCard cannot express that,
+           so a transition redraws the pane and everything else stays the
+           cheap patch it was. */
+        if (status.status !== px.selected.status) renderVMDetail(status);
+        else updateVMStats(status, detail);
       });
     }, 8000);
   }
@@ -4761,6 +4881,7 @@ if (pinReady) {
         // reload status after short delay
         setTimeout(function () {
           selectVM(nodeName, vmid, vmType, {});
+          refreshNodeTree(nodeName);
         }, 2500);
       });
     });
@@ -4932,6 +5053,7 @@ if (pinReady) {
           var total = 0;
           for (var i = 0; i < px.nodes.length; i++) total += (px.nodes[i]._vms || []).length;
           $p('px-subtitle').textContent = px.nodes.length + ' nodi · ' + total + ' VM';
+          startTreeRefresh();
         }
       }
 
@@ -4953,8 +5075,13 @@ if (pinReady) {
   /* ── Hook into tab navigation ───────────────────────── */
   window._onTabActivate('server', function () {
     if (!px.loaded) {
-      setTimeout(loadCluster, 60);
+      setTimeout(loadCluster, 60);   /* starts the tree refresh when done */
+      return;
     }
+    /* Re-entering the tab: the tree is still drawn but its dots are as old
+       as the last visit, so patch them now rather than at the first tick. */
+    startTreeRefresh();
+    for (var i = 0; i < px.nodes.length; i++) refreshNodeTree(px.nodes[i].node);
   });
 
   /* ── Settings: Proxmox save & test ─────────────────── */
@@ -5028,10 +5155,15 @@ if (pinReady) {
     window._markCredential($p('px-token'), pxTokenSet);
   });
 
-  /* Stops the node/VM status poller. Called from the tab-switch handler
-     when navigating away from Server, so leaving the tab doesn't leave a
-     background poll running indefinitely. */
-  window._pxStopPolling = function () { clearInterval(px.pollTimer); };
+  /* Stops the node/VM status poller and the tree refresh. Called from the
+     tab-switch handler when navigating away from Server, so leaving the tab
+     doesn't leave a background poll running indefinitely. Both timers go:
+     the tree ticker outlives any selection, so clearing only pollTimer
+     would leave it running for the rest of the session. */
+  window._pxStopPolling = function () {
+    clearInterval(px.pollTimer);
+    stopTreeRefresh();
+  };
 
   /* Used by the core module's wake-from-standby handler. _pxStopPolling
      kills the node/VM poll the moment you leave this tab (see above), so
@@ -5039,6 +5171,13 @@ if (pinReady) {
      re-opening whatever was selected is what restarts it. Storage rows
      have no poll, so they're left alone. */
   window._serverWakeRefresh = function () {
+    /* The tree ticker is stopped on the way out and skipped while the app
+       is hidden, so waking on this tab has to restart it — and the dots are
+       as stale as the standby was long, so patch them straight away. */
+    if (px.loaded) {
+      startTreeRefresh();
+      for (var i = 0; i < px.nodes.length; i++) refreshNodeTree(px.nodes[i].node);
+    }
     if (!px.selected) return;
     if (px.selected.kind === 'node') selectNode(px.selected.node);
     if (px.selected.kind === 'vm')   selectVM(px.selected.node, px.selected.vmid, px.selected.type);
