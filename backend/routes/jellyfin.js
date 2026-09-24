@@ -46,6 +46,7 @@ function getJFConfig() {
 function jfHeaders(token) {
   return {
     'X-Emby-Token':  token,
+    'Authorization': 'MediaBrowser Token="' + token + '"',
     'Content-Type':  'application/json',
     'Accept':        'application/json',
     'Connection':    'close'
