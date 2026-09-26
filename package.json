@@ -14,7 +14,7 @@
     "test:visual:capture": "node tests/visual/capture-fixtures.js"
   },
   "dependencies": {
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.3",
     "express": "^5.2.1",
     "express-rate-limit": "^8.7.0",
     "pino": "^10.3.1",
